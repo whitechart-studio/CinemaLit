@@ -696,22 +696,43 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def _handle_ch_scenes(self):
         try:
+            url_parts = urllib.parse.urlparse(self.path)
+            query_params = urllib.parse.parse_qs(url_parts.query)
+            proj_id = query_params.get("projectId", ["p1"])[0]
+
             result = ch_query(
                 f"SELECT scene_number, int_ext, location, time_of_day, page_count, shoot_day, status, description "
                 f"FROM {CH_DB}.scenes ORDER BY scene_number"
             )
             scenes = []
-            img_map = {
-                "01": "/sc1_f1.jpg",
-                "02": "/storyboard_sc2.jpg",
-                "03": "/storyboard_sc3.jpg",
-                "04": "/sc4_apartment.jpg",
-                "05": "/sc5_interrogation.jpg",
-                "06": "/sc6_docks.jpg",
-                "07": "/storyboard_sc3.jpg",
-                "08": "/sc4_apartment.jpg",
-                "09": "/sc6_docks.jpg",
-            }
+            
+            # Project specific artwork mapping
+            if proj_id == 'p2':
+                img_map = {
+                    "01": "/sc_cyberpunk.jpg",
+                    "02": "/sc6_docks.jpg",
+                    "03": "/sc1_f1.jpg",
+                    "04": "/sc4_apartment.jpg",
+                }
+            elif proj_id == 'p3':
+                img_map = {
+                    "01": "/sc_solaris.jpg",
+                    "02": "/sc5_interrogation.jpg",
+                    "03": "/sc4_apartment.jpg",
+                }
+            else:
+                img_map = {
+                    "01": "/sc1_f1.jpg",
+                    "02": "/storyboard_sc2.jpg",
+                    "03": "/storyboard_sc3.jpg",
+                    "04": "/sc4_apartment.jpg",
+                    "05": "/sc5_interrogation.jpg",
+                    "06": "/sc6_docks.jpg",
+                    "07": "/storyboard_sc3.jpg",
+                    "08": "/sc4_apartment.jpg",
+                    "09": "/sc6_docks.jpg",
+                }
+
             for r in result.get("data", []):
                 num = str(r[0]).replace("SC-", "").replace("SCENE ", "")
                 int_ext, loc, tod, pg = r[1], r[2], r[3], float(r[4])

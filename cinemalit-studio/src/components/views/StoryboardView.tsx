@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Film, ZoomIn, Clock, Settings2, HelpCircle, Trash2, FileText, X } from 'lucide-react';
 import { apiFetch } from '../../utils/api';
+import { useStudioStore } from '../../store/studio';
 import styles from './StoryboardView.module.css';
 
 interface StoryboardFrame {
@@ -133,6 +134,7 @@ const INITIAL_STORYBOARDS: SceneStoryboard[] = [
 ];
 
 export function StoryboardView() {
+  const { activeProject } = useStudioStore();
   const [storyboards, setStoryboards] = useState<SceneStoryboard[]>(INITIAL_STORYBOARDS);
   const [selectedSceneNum, setSelectedSceneNum] = useState<string>('01');
   const [generatingScene, setGeneratingScene] = useState<string | null>(null);
@@ -144,9 +146,9 @@ export function StoryboardView() {
   const [customLens, setCustomLens] = useState<string>('50mm Anamorphic');
   const [showScriptModal, setShowScriptModal] = useState<boolean>(false);
 
-  // Fetch Live Scenes from ClickHouse Database
+  // Fetch Live Scenes from ClickHouse Database for Active Project
   useEffect(() => {
-    apiFetch('/api/clickhouse/scenes')
+    apiFetch(`/api/clickhouse/scenes?projectId=${activeProject.id}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.status === 'ok' && data.scenes && data.scenes.length > 0) {
@@ -154,7 +156,7 @@ export function StoryboardView() {
         }
       })
       .catch((err) => console.log('ClickHouse offline, using local cache:', err));
-  }, []);
+  }, [activeProject.id]);
 
   const activeSb = storyboards.find((s) => s.sceneNum === selectedSceneNum) || storyboards[0];
 
