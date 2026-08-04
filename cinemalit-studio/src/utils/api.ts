@@ -8,5 +8,15 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   if (options.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(path, { ...options, headers });
+  
+  const response = await fetch(path, { ...options, headers });
+  
+  if (response.status === 401) {
+    // Token is invalid or expired
+    localStorage.removeItem('cinemalit_user');
+    localStorage.removeItem('cinemalit_token');
+    window.location.reload();
+  }
+  
+  return response;
 }
