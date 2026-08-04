@@ -11,6 +11,7 @@ import sys
 import json
 import re
 import uuid
+import time
 import urllib.error
 
 # Ensure root package import
@@ -606,23 +607,57 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             public_scene_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "public", "storyboards", f"scene_{scene_num.zfill(2)}"))
             os.makedirs(public_scene_dir, exist_ok=True)
 
+            scene_png_map = {
+                "01": ["/sc1_f1.jpg", "/sc1_f2.jpg", "/sc1_f3.jpg"],
+                "02": ["/storyboard_sc2.jpg", "/sc1_f1.jpg"],
+                "03": ["/storyboard_sc3.jpg", "/sc1_f3.jpg"],
+                "04": ["/sc4_apartment.jpg"],
+                "05": ["/sc5_interrogation.jpg"],
+                "06": ["/sc6_docks.jpg"],
+            }
+            scene_imgs = scene_png_map.get(scene_num, ["/sc1_f1.jpg"])
+
             processed_frames = []
             for idx, fr in enumerate(raw_frames, start=1):
-                src_img_rel = scene_imgs[(idx - 1) % len(scene_imgs)]
-                src_full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "public", src_img_rel.lstrip("/")))
-                
                 dest_file_name = f"frame_{str(idx).zfill(2)}.jpg"
                 dest_local_path = os.path.join(scene_dir, dest_file_name)
                 dest_public_path = os.path.join(public_scene_dir, dest_file_name)
 
-                # Copy to local storyboards directory structure
-                if os.path.exists(src_full_path):
-                    with open(src_full_path, "rb") as sf:
-                        content = sf.read()
-                        with open(dest_local_path, "wb") as df:
-                            df.write(content)
-                        with open(dest_public_path, "wb") as pf:
-                            pf.write(content)
+                # Attempt dynamic image generation via Pollinations / Picsum API
+                prompt_text = fr.get("prompt", f"Scene {scene_num} Keyframe {idx}")
+                img_data = None
+
+                try:
+                    # 1. Try Pollinations dynamic text-to-image API
+                    clean_prompt = re.sub(r"[^\w\s]", "", prompt_text)[:120]
+                    poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&seed={idx+int(scene_num)}"
+                    req = urllib.request.Request(poll_url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=8) as resp:
+                        img_data = resp.read()
+                except Exception as p_err:
+                    print(f"⚠️ Pollinations API ({p_err}) — trying dynamic picsum fallback...")
+                    try:
+                        # 2. Try Picsum dynamic random image API
+                        pic_url = f"https://picsum.photos/512/512?random={scene_num}{idx}"
+                        req = urllib.request.Request(pic_url, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req, timeout=6) as resp:
+                            img_data = resp.read()
+                    except Exception as pic_err:
+                        print(f"⚠️ Picsum API ({pic_err}) — copying local asset fallback.")
+
+                # Fallback to local image copy if network API is unreachable
+                if not img_data:
+                    src_img_rel = scene_imgs[(idx - 1) % len(scene_imgs)]
+                    src_full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "public", src_img_rel.lstrip("/")))
+                    if os.path.exists(src_full_path):
+                        with open(src_full_path, "rb") as sf:
+                            img_data = sf.read()
+
+                if img_data:
+                    with open(dest_local_path, "wb") as df:
+                        df.write(img_data)
+                    with open(dest_public_path, "wb") as pf:
+                        pf.write(img_data)
 
                 processed_frames.append(
                     {
@@ -631,8 +666,8 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                         "cameraSpec": fr.get("cameraSpec", "50mm Anamorphic"),
                         "startSec": fr.get("startSec", (idx - 1) * interval_sec),
                         "endSec": fr.get("endSec", idx * interval_sec),
-                        "prompt": fr.get("prompt", f"Scene {scene_num} Keyframe"),
-                        "imgUrl": f"/storyboards/scene_{scene_num.zfill(2)}/{dest_file_name}",
+                        "prompt": prompt_text,
+                        "imgUrl": f"/storyboards/scene_{scene_num.zfill(2)}/{dest_file_name}?t={int(time.time())}",
                     }
                 )
 
