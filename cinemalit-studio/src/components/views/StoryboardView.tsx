@@ -173,7 +173,6 @@ export function StoryboardView() {
     try {
       const resp = await apiFetch('/api/ai/generate-storyboard', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sceneNum,
           scriptSnippet: activeSb.desc,
