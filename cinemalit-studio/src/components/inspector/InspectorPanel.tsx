@@ -90,7 +90,14 @@ export function InspectorPanel() {
 
   const [folders, setFolders] = useState<TreeFolder[]>([
     {
-      name: '01_boards',
+      name: '01_storyboard',
+      open: true,
+      files: [
+        { name: 'storyboards.board', viewId: 'storyboard', icon: <Camera size={13} color="var(--gold)" /> },
+      ],
+    },
+    {
+      name: '02_boards',
       open: true,
       files: [
         { name: 'scene_flow.board', viewId: 'canvas', icon: <LayoutDashboard size={13} color="var(--gold)" /> },
