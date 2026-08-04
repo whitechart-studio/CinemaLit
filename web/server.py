@@ -599,8 +599,31 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "09": ["/sc6_docks.jpg"],
             }
             scene_imgs = scene_png_map.get(scene_num, ["/sc1_f1.jpg"])
+            
+            # Ensure local scene folder exists
+            scene_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "storyboards", f"scene_{scene_num.zfill(2)}"))
+            os.makedirs(scene_dir, exist_ok=True)
+            public_scene_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "public", "storyboards", f"scene_{scene_num.zfill(2)}"))
+            os.makedirs(public_scene_dir, exist_ok=True)
+
             processed_frames = []
             for idx, fr in enumerate(raw_frames, start=1):
+                src_img_rel = scene_imgs[(idx - 1) % len(scene_imgs)]
+                src_full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "public", src_img_rel.lstrip("/")))
+                
+                dest_file_name = f"frame_{str(idx).zfill(2)}.jpg"
+                dest_local_path = os.path.join(scene_dir, dest_file_name)
+                dest_public_path = os.path.join(public_scene_dir, dest_file_name)
+
+                # Copy to local storyboards directory structure
+                if os.path.exists(src_full_path):
+                    with open(src_full_path, "rb") as sf:
+                        content = sf.read()
+                        with open(dest_local_path, "wb") as df:
+                            df.write(content)
+                        with open(dest_public_path, "wb") as pf:
+                            pf.write(content)
+
                 processed_frames.append(
                     {
                         "frameNum": idx,
@@ -609,7 +632,7 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                         "startSec": fr.get("startSec", (idx - 1) * interval_sec),
                         "endSec": fr.get("endSec", idx * interval_sec),
                         "prompt": fr.get("prompt", f"Scene {scene_num} Keyframe"),
-                        "imgUrl": scene_imgs[(idx - 1) % len(scene_imgs)],
+                        "imgUrl": f"/storyboards/scene_{scene_num.zfill(2)}/{dest_file_name}",
                     }
                 )
 
