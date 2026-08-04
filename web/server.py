@@ -589,10 +589,16 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             scene_png_map = {
                 "01": ["/sc1_f1.jpg", "/sc1_f2.jpg", "/sc1_f3.jpg"],
-                "02": ["/storyboard_sc2.jpg", "/sc1_f1.jpg", "/sc1_f2.jpg"],
-                "03": ["/storyboard_sc3.jpg", "/sc1_f3.jpg", "/sc1_f1.jpg"],
+                "02": ["/storyboard_sc2.jpg", "/sc1_f1.jpg"],
+                "03": ["/storyboard_sc3.jpg", "/sc1_f3.jpg"],
+                "04": ["/sc4_apartment.jpg"],
+                "05": ["/sc5_interrogation.jpg"],
+                "06": ["/sc6_docks.jpg"],
+                "07": ["/storyboard_sc3.jpg"],
+                "08": ["/sc4_apartment.jpg"],
+                "09": ["/sc6_docks.jpg"],
             }
-            scene_imgs = scene_png_map.get(scene_num, scene_png_map["01"])
+            scene_imgs = scene_png_map.get(scene_num, ["/sc1_f1.jpg"])
             processed_frames = []
             for idx, fr in enumerate(raw_frames, start=1):
                 processed_frames.append(
@@ -695,6 +701,17 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                 f"FROM {CH_DB}.scenes ORDER BY scene_number"
             )
             scenes = []
+            img_map = {
+                "01": "/sc1_f1.jpg",
+                "02": "/storyboard_sc2.jpg",
+                "03": "/storyboard_sc3.jpg",
+                "04": "/sc4_apartment.jpg",
+                "05": "/sc5_interrogation.jpg",
+                "06": "/sc6_docks.jpg",
+                "07": "/storyboard_sc3.jpg",
+                "08": "/sc4_apartment.jpg",
+                "09": "/sc6_docks.jpg",
+            }
             for r in result.get("data", []):
                 num = str(r[0]).replace("SC-", "").replace("SCENE ", "")
                 int_ext, loc, tod, pg = r[1], r[2], r[3], float(r[4])
@@ -710,7 +727,7 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                                 "id": f"f-{num}-1",
                                 "frameNum": 1,
                                 "title": f"Frame 01 — Establishing {loc}",
-                                "imgUrl": "/sc1_f1.jpg" if num == "01" else ("/storyboard_sc2.jpg" if num == "02" else "/storyboard_sc3.jpg"),
+                                "imgUrl": img_map.get(num, "/sc1_f1.jpg"),
                                 "prompt": f"{int_ext} {loc} {tod} cinematic establishing shot",
                                 "cameraSpec": "35mm Prime · Static Wide",
                                 "startSec": 0,
