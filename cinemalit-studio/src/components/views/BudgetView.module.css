@@ -1,0 +1,114 @@
+/* src/components/views/BudgetView.module.css */
+.view {
+  flex: 1; display: flex; flex-direction: column;
+  background: var(--bg); height: 100%; overflow: hidden;
+}
+
+.header {
+  height: 52px; background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; flex-shrink: 0;
+}
+
+.title { font-size: .88rem; font-weight: 800; color: var(--t1); }
+
+.hdrBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--t2);
+  transition: all .14s;
+}
+.hdrBtn:hover { background: var(--bg-hover); color: var(--gold); border-color: var(--gold); }
+
+.totals { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+.totLabel { font-size: .62rem; color: var(--t3); font-weight: 700; text-transform: uppercase; }
+.totVal { font-size: .95rem; font-weight: 900; color: var(--t1); }
+
+.addFormRow {
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addInput, .addSelect {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--t1);
+  font-size: .78rem;
+  outline: none;
+}
+.addInput:focus, .addSelect:focus { border-color: var(--gold); }
+
+.submitAddBtn {
+  padding: 6px 12px;
+  background: var(--gold);
+  color: #000;
+  border-radius: 6px;
+  font-size: .76rem;
+  font-weight: 800;
+  transition: all .14s;
+}
+.submitAddBtn:hover { background: #FBBF24; }
+
+.cancelAddBtn {
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--t3);
+  font-size: .76rem;
+  transition: all .14s;
+}
+.cancelAddBtn:hover { color: var(--t1); }
+
+.body { flex: 1; overflow-y: auto; padding: 16px; }
+
+.table { width: 100%; border-collapse: collapse; font-size: .78rem; text-align: left; }
+.table th, .table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+.table th { background: var(--bg-panel); color: var(--t3); font-weight: 700; font-size: .66rem; text-transform: uppercase; }
+
+.catRow td { background: var(--bg-panel); font-weight: 800; color: var(--gold); letter-spacing: .04em; }
+
+.numInput {
+  width: 70px; background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 6px; color: var(--t1); font-size: .78rem;
+  font-family: var(--mono); text-align: right; margin-left: 2px;
+}
+.numInput:focus { border-color: var(--gold); outline: none; }
+
+.over { color: var(--red); font-weight: 700; }
+.under { color: var(--grn); font-weight: 700; }
+
+.pill { font-size: .64rem; font-weight: 800; padding: 2px 7px; border-radius: 10px; }
+.pillOk { background: var(--grn-d); color: var(--grn); }
+.pillOver { background: var(--red-d); color: var(--red); }
+.pillPlan { background: var(--gold-d); color: var(--gold); }
+
+.contingencyRow td {
+  background: rgba(6, 182, 212, 0.08);
+  font-weight: 700;
+  border-top: 2px solid var(--cyan);
+}
+
+.delRowBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  transition: all .14s;
+}
+.delRowBtn:hover { background: var(--red-d); color: var(--red); }

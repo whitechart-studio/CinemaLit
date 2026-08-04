@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CinemaLit Studio | Hollywood Director Workbench</title>
+<meta name="description" content="Professional Hollywood-grade director and producer workbench — AI-powered scene breakdown, stripboard scheduling, shot lists, and ClickHouse memory.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+:root {
+  --bg:        #09090E;
+  --bg-panel:  #111118;
+  --bg-elev:   #191924;
+  --bg-hover:  #21212E;
+  --bg-active: #292939;
+  --border:    rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.13);
+  --t1: #F0F0F5;
+  --t2: #8A8A9E;
+  --t3: #52526A;
+  --gold:   #F59E0B;
+  --gold-d: rgba(245,158,11,0.14);
+  --cyan:   #06B6D4;
+  --cyan-d: rgba(6,182,212,0.14);
+  --red:    #EF4444;
+  --red-d:  rgba(239,68,68,0.14);
+  --grn:    #22C55E;
+  --grn-d:  rgba(34,197,94,0.14);
+  --pur:    #A855F7;
+  --pur-d:  rgba(168,85,247,0.14);
+  --sin:    #1A1A2E; --sin-a: #4ADE80;
+  --sen:    #0E1829; --sen-a: #60A5FA;
+  --sed:    #2E2A10; --sed-a: #F59E0B;
+  --sid:    #1C1C0E; --sid-a: #E5D87A;
+  --font:  'Inter', -apple-system, sans-serif;
+  --mono:  'JetBrains Mono', monospace;
+  --rail:  240px;
+  --top:   48px;
+  --ins:   360px;
+  --bar:   28px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font-family:var(--font);cursor:pointer;border:none;background:none}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--bg-active);border-radius:2px}
+.ico{width:16px;height:16px;stroke-width:2;display:inline-block;vertical-align:middle;flex-shrink:0}
+.ico-s{width:13px;height:13px}.ico-l{width:20px;height:20px}.ico-xl{width:24px;height:24px}
+
+/* ── TOPBAR ── */
+#topbar{height:var(--top);background:var(--bg-panel);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:100;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-mark{width:29px;height:29px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#000;box-shadow:0 0 14px rgba(245,158,11,.35)}
+.brand-name{font-size:.95rem;font-weight:900;letter-spacing:-.03em;color:var(--t1)}
+.brand-name span{color:var(--gold)}
+.proj-pill{display:flex;align-items:center;gap:7px;padding:4px 11px;background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s}
+.proj-pill:hover{border-color:var(--border-hi);background:var(--bg-hover)}
+.proj-name{font-size:.84rem;font-weight:700}
+.proj-phase{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);background:var(--gold-d);padding:2px 6px;border-radius:3px}
+.stat-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:.02em}
+.dot{width:6px;height:6px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.chip-g{background:var(--grn-d);color:var(--grn)}.chip-g .dot{background:var(--grn)}
+.chip-c{background:var(--cyan-d);color:var(--cyan)}.chip-c .dot{background:var(--cyan)}
+.chip-a{background:var(--gold-d);color:var(--gold)}.chip-a .dot{background:var(--gold)}
+.btn-gold{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;background:var(--gold);color:#000;border-radius:7px;font-size:.78rem;font-weight:800;transition:all .15s}
+.btn-gold:hover{background:#FBBF24;box-shadow:0 0 14px rgba(245,158,11,.4)}
+.btn-ico{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--t2);transition:all .15s}
+.btn-ico:hover{background:var(--bg-hover);color:var(--t1)}
+.avatar{width:27px;height:27px;border-radius:50%;background:linear-gradient(135deg,var(--pur),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff;border:2px solid var(--border-hi);cursor:pointer}
+
+/* ── WORKBENCH ── */
+#wb{height:calc(100vh - var(--top));display:flex;overflow:hidden}
+
+/* ── LEFT NAV RAIL ── */
+#rail{width:var(--rail);background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:50;overflow:hidden}
+.rail-lbl{padding:13px 14px 5px;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3)}
+.nav-itm{display:flex;align-items:center;gap:9px;padding:8px 14px;cursor:pointer;color:var(--t2);font-size:.82rem;font-weight:500;border-left:2px solid transparent;transition:all .14s;user-select:none}
+.nav-itm:hover{background:var(--bg-hover);color:var(--t1)}
+.nav-itm.active{background:var(--bg-active);color:var(--t1);border-left-color:var(--gold);font-weight:600}
+.nav-itm.active .nav-ico{color:var(--gold)}
+.nav-badge{margin-left:auto;font-size:.65rem;font-weight:800;padding:1px 6px;border-radius:8px;background:var(--bg-active);color:var(--t3)}
+.rail-div{height:1px;background:var(--border);margin:6px 0}
+.stat-box{background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:9px 11px;display:flex;flex-direction:column;gap:6px;margin:6px 10px}
+.s-row{display:flex;justify-content:space-between;align-items:center;font-size:.72rem}
+.s-lbl{color:var(--t3)}.s-val{font-weight:700;color:var(--t1)}
+.s-ok{color:var(--grn)}.s-warn{color:var(--gold)}.s-bad{color:var(--red)}
+.pbar{height:3px;background:var(--bg-hover);border-radius:2px;overflow:hidden;margin-top:2px}
+.pfill{height:100%;border-radius:2px;transition:width .5s}
+
+/* ── AI CAPSULE ── */
+.rail-bottom{margin-top:auto;border-top:1px solid var(--border);padding:10px}
+.capsule{background:var(--bg-elev);border:1px solid var(--border);border-radius:9px;overflow:hidden;transition:border-color .15s}
+.capsule:focus-within{border-color:rgba(6,182,212,.4)}
+.cap-hdr{display:flex;align-items:center;gap:7px;padding:7px 9px;border-bottom:1px solid var(--border);font-size:.72rem;font-weight:700;color:var(--cyan)}
+.cap-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 1.5s infinite}
+.cap-ta{width:100%;border:none;outline:none;background:transparent;color:var(--t1);font-size:.78rem;font-family:var(--font);resize:none;padding:6px 9px;min-height:46px;line-height:1.5}
+.cap-ta::placeholder{color:var(--t3)}
+.cap-bar{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-top:1px solid var(--border)}
+.cap-l{display:flex;gap:2px}
+.c-ibtn{width:27px;height:27px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:all .14s}
+.c-ibtn:hover{background:var(--bg-hover);color:var(--t1)}
+.c-ibtn.mic-on{background:var(--red-d);color:var(--red);animation:pulse 1.5s infinite}
+.c-send{width:27px;height:27px;border-radius:6px;background:var(--cyan);color:#000;display:flex;align-items:center;justify-content:center;transition:all .14s}
+.c-send:hover{background:#22D3EE;box-shadow:0 0 10px rgba(6,182,212,.4)}
+.agent-msg{padding:4px 9px 2px;font-size:.72rem;line-height:1.4}
+.am-from{color:var(--cyan);font-weight:700;font-size:.65rem;margin-bottom:1px}
+.am-text{color:var(--t2)}
+
+/* ── CENTER ── */
+#cw{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#ws-hdr{height:38px;background:var(--bg-panel);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 6px;gap:1px;overflow-x:auto;flex-shrink:0}
+#ws-hdr::-webkit-scrollbar{height:0}
+.ws-tab{display:inline-flex;align-items:center;gap:5px;padding:0 10px;font-size:.76rem;font-weight:500;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .14s;user-select:none}
+.ws-tab:hover{color:var(--t2)}
+.ws-tab.active{color:var(--t1);border-bottom-color:var(--gold);font-weight:600}
+.ws-sep{width:1px;background:var(--border);margin:8px 3px}
+.ws-acts{margin-left:auto;display:flex;align-items:center;gap:3px;padding:0 3px}
+#wsc{flex:1;position:relative;overflow:hidden}
+.view{position:absolute;inset:0;display:none}
+.view.active{display:flex}
+
+/* ── STATUS BAR ── */
+#sbar{height:var(--bar);background:var(--bg-panel);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:14px;font-size:.68rem;color:var(--t3);flex-shrink:0}
+.si{display:flex;align-items:center;gap:4px}
+.si strong{color:var(--t2);font-weight:600}
+.ss{color:var(--border-hi)}
+.sr{margin-left:auto;display:flex;gap:10px;align-items:center}
+
+/* ── CANVAS VIEW ── */
+#view-canvas{flex-direction:column}
+.cv-area{flex:1;position:relative;background:var(--bg);overflow:hidden;cursor:default}
+.cv-area::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.06) 1px,transparent 1px);background-size:26px 26px;pointer-events:none}
+#board{position:absolute;top:0;left:0;width:4000px;height:3000px;transform-origin:0 0}
+#cvgsvg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+/* SCENE NODES */
+.snode{position:absolute;width:220px;background:var(--bg-elev);border:1px solid var(--border);border-radius:11px;cursor:grab;user-select:none;transition:box-shadow .15s,border-color .15s;overflow:hidden}
+.snode:active{cursor:grabbing}
+.snode:hover{border-color:var(--border-hi);box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.snode.sel{border-color:var(--gold) !important;box-shadow:0 0 0 2px rgba(245,158,11,.28),0 8px 28px rgba(0,0,0,.55)}
+.nh{height:52px;display:flex;align-items:flex-end;justify-content:space-between;padding:7px 9px;position:relative}
+.nh::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 20%,rgba(0,0,0,.45));pointer-events:none}
+.nh-sin{background:linear-gradient(135deg,#1A1A2E,#252540)}
+.nh-sen{background:linear-gradient(135deg,#0E1829,#172540)}
+.nh-sed{background:linear-gradient(135deg,#2E2A10,#40380A)}
+.nh-sid{background:linear-gradient(135deg,#1C1C0E,#30301A)}
+.n-num{font-size:.62rem;font-weight:800;letter-spacing:.07em;color:rgba(255,255,255,.85);position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.n-badge{font-size:.59rem;font-weight:800;letter-spacing:.05em;padding:2px 5px;border-radius:3px;position:relative;z-index:1}
+.b-sin{background:rgba(74,222,128,.18);color:#4ADE80}
+.b-sen{background:rgba(96,165,250,.18);color:#60A5FA}
+.b-sed{background:rgba(245,158,11,.18);color:#F59E0B}
+.b-sid{background:rgba(229,216,122,.18);color:#E5D87A}
+.nbody{padding:9px 9px 7px;display:flex;flex-direction:column;gap:4px}
+.n-loc{font-size:.76rem;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n-meta{display:flex;align-items:center;gap:5px;font-size:.65rem;color:var(--t3)}
+.mdot{width:3px;height:3px;border-radius:50%;background:var(--t3)}
+.n-cast{display:flex;gap:3px;flex-wrap:wrap;margin-top:1px}
+.cc{font-size:.62rem;font-weight:600;padding:2px 5px;background:var(--bg-hover);border-radius:8px;color:var(--t2)}
+.nfoot{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;border-top:1px solid var(--border);background:rgba(0,0,0,.18)}
+.rpill{display:inline-flex;align-items:center;gap:3px;font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:8px}
+.r-lo{background:var(--grn-d);color:var(--grn)}
+.r-md{background:var(--gold-d);color:var(--gold)}
+.r-hi{background:var(--red-d);color:var(--red)}
+.n-pg{font-size:.65rem;font-weight:700;color:var(--t3)}
+
+/* CANVAS TOOLBAR */
+#cvtb{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(17,17,24,.93);backdrop-filter:blur(12px);border:1px solid var(--border-hi);border-radius:36px;padding:4px 9px;display:flex;align-items:center;gap:3px;box-shadow:0 8px 30px rgba(0,0,0,.65);z-index:50}
+.ctool{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--t2);transition:all .14s;font-size:.7rem}
+.ctool:hover{background:var(--bg-hover);color:var(--t1)}
+.ctool.active{background:var(--gold);color:#000}
+.tb-sep{width:1px;height:18px;background:var(--border);margin:0 3px}
+.z-disp{font-size:.7rem;font-weight:700;color:var(--t2);min-width:36px;text-align:center}
+
+/* MINIMAP */
+#mmap{position:absolute;bottom:10px;right:10px;background:rgba(17,17,24,.9);backdrop-filter:blur(8px);border:1px solid var(--border-hi);border-radius:7px;overflow:hidden;z-index:50;cursor:default}
+
+/* ── SCRIPT VIEW ── */
+#view-script{flex-direction:row;background:var(--bg)}
+.scr-nav{width:190px;background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;padding:10px;flex-shrink:0}
+.scr-nav-ttl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);padding:3px 0 8px}
+.sni{padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.73rem;color:var(--t2);transition:all .14s;margin-bottom:2px}
+.sni:hover{background:var(--bg-hover);color:var(--t1)}
+.sni.active{background:var(--bg-active);color:var(--gold);font-weight:600}
+.sni-num{font-size:.62rem;color:var(--t3);font-weight:700;margin-bottom:1px}
+.scr-body{flex:1;overflow-y:auto;display:flex;justify-content:center;padding:36px 20px}
+.sp-doc{width:100%;max-width:630px;font-family:var(--mono)}
+.sp-title{text-align:center;margin-bottom:50px;padding-bottom:34px;border-bottom:1px solid var(--border)}
+.sp-title h1{font-size:1.5rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.sp-title p{color:var(--t3);font-size:.8rem}
+.stag{display:inline-block;background:var(--gold-d);color:var(--gold);font-size:.62rem;font-weight:800;letter-spacing:.08em;padding:2px 6px;border-radius:3px;margin-bottom:3px}
+.slug{color:var(--t1);font-weight:700;font-size:.86rem;letter-spacing:.04em;text-transform:uppercase;padding:16px 0 7px;border-top:1px solid var(--border);margin-top:22px}
+.slug.first{border-top:none;margin-top:0;padding-top:0}
+.aln{font-size:.83rem;line-height:1.7;color:var(--t2);margin:5px 0}
+.cname{text-align:center;font-weight:700;font-size:.83rem;color:var(--t1);text-transform:uppercase;letter-spacing:.05em;padding-top:10px;padding-left:150px}
+.dial{padding-left:90px;padding-right:70px;font-size:.83rem;line-height:1.55;color:var(--t2);padding-top:3px}
+.paren{padding-left:110px;font-size:.8rem;color:var(--t3);font-style:italic}
+
+/* ── BREAKDOWN VIEW ── */
+#view-breakdown{flex-direction:column;background:var(--bg)}
+.bk-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-panel);flex-shrink:0}
+.bk-ttl{font-size:.88rem;font-weight:700}
+.bk-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.bk-card{background:var(--bg-panel);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.bk-ch{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.bk-ct{font-size:.82rem;font-weight:700;flex:1}
+.bk-cb{padding:10px 12px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.bk-cat-lbl{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:4px}
+.etag{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:4px;font-size:.7rem;font-weight:600;margin:2px;cursor:default}
+.et-cast{background:var(--pur-d);color:var(--pur)}
+.et-prop{background:var(--gold-d);color:var(--gold)}
+.et-vfx{background:var(--cyan-d);color:var(--cyan)}
+.et-ward{background:var(--grn-d);color:var(--grn)}
+.et-sfx{background:var(--red-d);color:var(--red)}
+
+/* ── STRIPBOARD VIEW ── */
+#view-stripboard{flex-direction:column;background:var(--bg)}
+.sb-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-panel);flex-shrink:0}
+.sb-ttl{font-size:.88rem;font-weight:700}
+.legend{display:flex;gap:10px;margin-left:auto}
+.leg-i{display:flex;align-items:center;gap:4px;font-size:.68rem;color:var(--t2)}
+.leg-s{width:11px;height:11px;border-radius:2px}
+.sb-body{flex:1;overflow:auto;padding:12px}
+.sb-grid{display:flex;gap:10px;min-height:300px}
+.day-col{flex:1;min-width:190px;display:flex;flex-direction:column;gap:5px}
+.day-hdr{background:var(--bg-panel);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:.73rem;font-weight:700;display:flex;justify-content:space-between;align-items:flex-start}
+.day-sub{font-size:.65rem;color:var(--t3);font-weight:400;margin-top:2px}
+.strip{border-radius:5px;padding:7px 9px;border-left:3px solid;cursor:pointer;transition:filter .14s;display:flex;flex-direction:column;gap:2px}
+.strip:hover{filter:brightness(1.2)}
+.s-sin{background:var(--sin);border-left-color:var(--sin-a)}
+.s-sen{background:var(--sen);border-left-color:var(--sen-a)}
+.s-sed{background:var(--sed);border-left-color:var(--sed-a)}
+.s-sid{background:var(--sid);border-left-color:var(--sid-a)}
+.strip-n{font-size:.62rem;font-weight:800;color:var(--t3);letter-spacing:.06em}
+.strip-l{font-size:.76rem;font-weight:700}
+.strip-m{font-size:.65rem;color:var(--t2);display:flex;gap:5px}
+.dood-sec{margin-top:14px}
+.dood-lbl{font-size:.72rem;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+.dtbl{width:100%;border-collapse:collapse;font-size:.7rem}
+.dtbl th,.dtbl td{padding:6px 10px;border:1px solid var(--border);text-align:center}
+.dtbl th{background:var(--bg-panel);color:var(--t3);font-weight:700}
+.dtbl td{background:var(--bg-elev);color:var(--t2)}
+.d-sw{background:var(--grn-d) !important;color:var(--grn) !important;font-weight:800}
+.d-w{background:var(--cyan-d) !important;color:var(--cyan) !important;font-weight:800}
+.d-h{background:var(--gold-d) !important;color:var(--gold) !important;font-weight:800}
+.d-wf{background:var(--red-d) !important;color:var(--red) !important;font-weight:800}
+
+/* ── SHOT LIST VIEW ── */
+#view-shotlist{flex-direction:column;background:var(--bg)}
+.sl-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-panel);flex-shrink:0;flex-wrap:wrap}
+.sl-ttl{font-size:.88rem;font-weight:700;margin-right:6px}
+.fchip{padding:3px 9px;border-radius:16px;font-size:.7rem;font-weight:700;cursor:pointer;border:1px solid var(--border);color:var(--t2);transition:all .14s}
+.fchip:hover,.fchip.on{background:var(--gold-d);color:var(--gold);border-color:var(--gold)}
+.sl-body{flex:1;overflow:auto;padding:0}
+.stbl{width:100%;border-collapse:collapse;font-size:.76rem}
+.stbl th{padding:9px 11px;background:var(--bg-panel);color:var(--t3);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2}
+.stbl td{padding:8px 11px;border-bottom:1px solid var(--border);color:var(--t2);vertical-align:middle}
+.stbl tr:hover td{background:var(--bg-hover);color:var(--t1)}
+.shot-n{font-weight:800;color:var(--t1);font-size:.78rem}
+.stype{display:inline-block;padding:2px 7px;border-radius:3px;font-size:.65rem;font-weight:800;letter-spacing:.04em}
+.ty-ws{background:var(--cyan-d);color:var(--cyan)}
+.ty-ms{background:var(--pur-d);color:var(--pur)}
+.ty-cu{background:var(--gold-d);color:var(--gold)}
+.ty-ecu{background:var(--red-d);color:var(--red)}
+.ty-pov{background:var(--grn-d);color:var(--grn)}
+.sspill{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:.64rem;font-weight:700}
+.ss-plan{background:var(--bg-hover);color:var(--t3)}
+.ss-ok{background:var(--grn-d);color:var(--grn)}
+.ss-shot{background:var(--cyan-d);color:var(--cyan)}
+
+/* ── BUDGET VIEW ── */
+#view-budget{flex-direction:column;background:var(--bg)}
+.bg-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-panel);flex-shrink:0}
+.bg-ttl{font-size:.88rem;font-weight:700}
+.bg-totals{margin-left:auto;display:flex;gap:16px;align-items:center}
+.bg-tv{font-size:.68rem;color:var(--t3)}
+.bg-tval{font-size:1.05rem;font-weight:800}
+.bg-body{flex:1;overflow:auto;padding:0}
+.btbl{width:100%;border-collapse:collapse;font-size:.8rem}
+.btbl th{padding:9px 12px;background:var(--bg-panel);color:var(--t3);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;text-align:left;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.btbl td{padding:9px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--t2)}
+.btbl tr:hover td{background:var(--bg-hover)}
+.b-cat td{background:var(--bg-elev);color:var(--t1);font-weight:700}
+.over{color:var(--red) !important;font-weight:700}
+.under{color:var(--grn) !important;font-weight:700}
+
+/* ── CALL SHEET VIEW ── */
+#view-callsheet{background:var(--bg);justify-content:center;align-items:flex-start;overflow-y:auto;padding:24px}
+.cs-doc{width:100%;max-width:800px;background:var(--bg-panel);border:1px solid var(--border);border-radius:11px;overflow:hidden}
+.cs-banner{background:linear-gradient(135deg,#09090E,#16162A);padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.cs-prod{font-size:1.05rem;font-weight:800}
+.cs-day{font-size:.76rem;color:var(--t3);margin-top:2px}
+.cs-sec{padding:14px 22px;border-bottom:1px solid var(--border)}
+.cs-sec-ttl{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:9px}
+.cs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cs-f-lbl{font-size:.62rem;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.cs-f-val{font-size:.8rem;color:var(--t1);font-weight:600}
+.cctbl{width:100%;border-collapse:collapse;font-size:.78rem}
+.cctbl th{padding:7px 11px;text-align:left;color:var(--t3);font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)}
+.cctbl td{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--t2)}
+.cctbl tr:hover td{background:var(--bg-hover)}
+
+/* ── SQL VIEW ── */
+#view-sql{flex-direction:row;background:var(--bg)}
+.sql-side{width:210px;background:var(--bg-panel);border-right:1px solid var(--border);padding:10px;overflow-y:auto;flex-shrink:0}
+.sql-side-ttl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:8px}
+.dbi{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:5px;cursor:pointer;font-size:.73rem;color:var(--t2);transition:all .14s;margin-bottom:2px}
+.dbi:hover{background:var(--bg-hover);color:var(--t1)}
+.sql-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.sql-ed-area{height:160px;padding:10px;border-bottom:1px solid var(--border);background:#06060C;flex-shrink:0}
+.sql-ed{width:100%;height:100%;background:transparent;border:none;outline:none;color:#7DD3FC;font-family:var(--mono);font-size:.8rem;line-height:1.6;resize:none}
+.sql-tb{padding:5px 10px;border-bottom:1px solid var(--border);background:var(--bg-panel);display:flex;gap:7px;align-items:center;flex-shrink:0}
+.btn-run{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;background:var(--cyan);color:#000;border-radius:5px;font-size:.73rem;font-weight:800;transition:all .14s}
+.btn-run:hover{background:#22D3EE}
+.sql-res{flex:1;overflow:auto;padding:10px}
+.srtbl{width:100%;border-collapse:collapse;font-size:.73rem;font-family:var(--mono)}
+.srtbl th{padding:6px 11px;background:var(--bg-panel);color:var(--cyan);font-weight:700;text-align:left;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.srtbl td{padding:6px 11px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--t2)}
+.srtbl tr:hover td{background:var(--bg-hover)}
+
+/* ── INSPECTOR ── */
+#insp{width:0;background:var(--bg-panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s cubic-bezier(.4,0,.2,1);flex-shrink:0}
+#insp.open{width:var(--ins)}
+.insp-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.insp-ttl{font-size:.78rem;font-weight:700}
+.itabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.itab{flex:1;padding:7px 5px;font-size:.7rem;font-weight:600;color:var(--t3);text-align:center;cursor:pointer;border-bottom:2px solid transparent;transition:all .14s}
+.itab:hover{color:var(--t2)}
+.itab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.ibody{flex:1;overflow-y:auto;padding:12px}
+.ifg{margin-bottom:14px}
+.ig-ttl{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:7px}
+.ifield{display:grid;grid-template-columns:95px 1fr;gap:7px;margin-bottom:6px;align-items:start}
+.ilbl{font-size:.7rem;color:var(--t3)}
+.ival{font-size:.76rem;color:var(--t1);font-weight:600}
+.itag-list{display:flex;flex-wrap:wrap;gap:3px}
+.ai-box{background:var(--cyan-d);border:1px solid rgba(6,182,212,.25);border-radius:7px;padding:9px 11px;margin-top:10px}
+.ai-box-ttl{font-size:.65rem;font-weight:800;color:var(--cyan);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.ai-box-txt{font-size:.73rem;color:var(--t2);line-height:1.5}
+.sbar-row{display:flex;align-items:center;gap:9px;margin-bottom:6px;font-size:.7rem}
+.sbar-lbl{width:76px;color:var(--t3)}
+.sbar-tr{flex:1;height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:2px}
+.sbar-v{width:26px;text-align:right;color:var(--t2);font-weight:700}
+
+/* Misc */
+.kbd{display:inline-block;padding:1px 4px;border:1px solid var(--border-hi);border-radius:3px;font-size:.6rem;font-family:var(--mono);color:var(--t3);background:var(--bg-elev)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header id="topbar">
+  <div class="brand">
+    <div class="brand-mark"><i data-lucide="clapperboard" class="ico-l"></i></div>
+    <span class="brand-name">Cinema<span>Lit</span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="proj-pill">
+      <i data-lucide="film" class="ico-s" style="color:var(--gold)"></i>
+      <span class="proj-name">Neon Echoes</span>
+      <span class="proj-phase">Pre-Prod</span>
+      <i data-lucide="chevron-down" class="ico-s" style="color:var(--t3)"></i>
+    </div>
+    <div style="display:flex;gap:5px">
+      <div class="stat-chip chip-g"><span class="dot"></span>ClickHouse</div>
+      <div class="stat-chip chip-c"><span class="dot"></span>3 AI Agents</div>
+      <div class="stat-chip chip-a"><span class="dot"></span>Pre-Production</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px">
+    <button class="btn-ico" title="Search"><i data-lucide="search" class="ico"></i></button>
+    <button class="btn-ico" title="Notifications"><i data-lucide="bell" class="ico"></i></button>
+    <button class="btn-ico" title="Settings"><i data-lucide="settings" class="ico"></i></button>
+    <button class="btn-gold" onclick="exportBinder()"><i data-lucide="download" class="ico-s"></i>Greenlight Binder</button>
+    <div class="avatar" title="Director">AK</div>
+  </div>
+</header>
+
+<!-- WORKBENCH -->
+<div id="wb">
+
+<!-- NAV RAIL -->
+<nav id="rail">
+  <div class="rail-lbl">Workspace</div>
+  <div class="nav-itm active" id="nav-canvas" onclick="sv('canvas')"><i data-lucide="layout-dashboard" class="ico nav-ico"></i><span>Scene Flow</span><span class="nav-badge">3</span></div>
+  <div class="nav-itm" id="nav-script" onclick="sv('script')"><i data-lucide="file-text" class="ico nav-ico"></i><span>Screenplay</span></div>
+  <div class="nav-itm" id="nav-breakdown" onclick="sv('breakdown')"><i data-lucide="layers" class="ico nav-ico"></i><span>Breakdown</span></div>
+  <div class="nav-itm" id="nav-stripboard" onclick="sv('stripboard')"><i data-lucide="calendar-days" class="ico nav-ico"></i><span>Stripboard</span></div>
+  <div class="nav-itm" id="nav-shotlist" onclick="sv('shotlist')"><i data-lucide="camera" class="ico nav-ico"></i><span>Shot List</span><span class="nav-badge">10</span></div>
+  <div class="nav-itm" id="nav-budget" onclick="sv('budget')"><i data-lucide="dollar-sign" class="ico nav-ico"></i><span>Budget</span></div>
+  <div class="nav-itm" id="nav-callsheet" onclick="sv('callsheet')"><i data-lucide="clipboard-list" class="ico nav-ico"></i><span>Call Sheet</span></div>
+  <div class="rail-div"></div>
+  <div class="nav-itm" id="nav-sql" onclick="sv('sql')"><i data-lucide="database" class="ico nav-ico"></i><span>ClickHouse</span></div>
+
+  <div class="stat-box">
+    <div class="s-row"><span class="s-lbl">Budget</span><span class="s-val s-bad">$8,110/$5k</span></div>
+    <div class="pbar"><div class="pfill" style="width:100%;background:var(--red)"></div></div>
+    <div class="s-row"><span class="s-lbl">Shoot Days</span><span class="s-val s-warn">2 of 2</span></div>
+    <div class="s-row"><span class="s-lbl">Scenes OK</span><span class="s-val s-ok">1/3</span></div>
+    <div class="s-row"><span class="s-lbl">Shots Planned</span><span class="s-val">10</span></div>
+  </div>
+
+  <div class="rail-bottom">
+    <div class="capsule">
+      <div class="cap-hdr"><div class="cap-dot"></div>Director Engine · Gemini 2.5 Pro</div>
+      <div class="agent-msg"><div class="am-from">↩ Engine</div><div class="am-text">Scene 2 rain FX flagged. Consolidate ext. locations to save ~$800.</div></div>
+      <textarea class="cap-ta" id="agentInput" placeholder="Ask Director Agent…" rows="2" onkeydown="capKey(event)"></textarea>
+      <div class="cap-bar">
+        <div class="cap-l">
+          <button class="c-ibtn" title="Attach" onclick="capAttach()"><i data-lucide="paperclip" class="ico-s"></i></button>
+          <button class="c-ibtn" id="micBtn" title="Voice" onclick="capMic()"><i data-lucide="mic" class="ico-s"></i></button>
+          <button class="c-ibtn" title="Agent"><i data-lucide="bot" class="ico-s"></i></button>
+          <button class="c-ibtn" title="ClickHouse"><i data-lucide="database" class="ico-s"></i></button>
+        </div>
+        <button class="c-send" title="Send" onclick="capSend()"><i data-lucide="arrow-up" class="ico-s"></i></button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- CENTER WORKSPACE -->
+<main id="cw">
+  <!-- TAB BAR -->
+  <div id="ws-hdr">
+    <div class="ws-tab active" id="tab-canvas" onclick="sv('canvas')"><i data-lucide="layout-dashboard" class="ico-s"></i>Scene Flow</div>
+    <div class="ws-tab" id="tab-script" onclick="sv('script')"><i data-lucide="file-text" class="ico-s"></i>Screenplay</div>
+    <div class="ws-tab" id="tab-breakdown" onclick="sv('breakdown')"><i data-lucide="layers" class="ico-s"></i>Breakdown</div>
+    <div class="ws-tab" id="tab-stripboard" onclick="sv('stripboard')"><i data-lucide="calendar-days" class="ico-s"></i>Stripboard</div>
+    <div class="ws-tab" id="tab-shotlist" onclick="sv('shotlist')"><i data-lucide="camera" class="ico-s"></i>Shot List</div>
+    <div class="ws-tab" id="tab-budget" onclick="sv('budget')"><i data-lucide="dollar-sign" class="ico-s"></i>Budget</div>
+    <div class="ws-tab" id="tab-callsheet" onclick="sv('callsheet')"><i data-lucide="clipboard-list" class="ico-s"></i>Call Sheet</div>
+    <div class="ws-sep"></div>
+    <div class="ws-tab" id="tab-sql" onclick="sv('sql')"><i data-lucide="database" class="ico-s"></i>ClickHouse</div>
+    <div class="ws-acts">
+      <button class="btn-ico" title="Toggle Inspector" onclick="togInsp()"><i data-lucide="panel-right" class="ico-s"></i></button>
+      <button class="btn-ico" title="Fullscreen" onclick="togFS()"><i data-lucide="maximize-2" class="ico-s"></i></button>
+    </div>
+  </div>
+
+  <!-- VIEWS -->
+  <div id="wsc">
+
+    <!-- SCENE FLOW CANVAS -->
+    <div class="view active" id="view-canvas">
+      <div class="cv-area" id="cvArea"
+        onwheel="cvWheel(event)"
+        onmousedown="cvMD(event)"
+        onmousemove="cvMM(event)"
+        onmouseup="cvMU(event)"
+        onmouseleave="cvMU(event)">
+
+        <div id="cvtb">
+          <button class="ctool active" id="t-select" onclick="setTool('select')" title="Select (V)"><i data-lucide="mouse-pointer-2" class="ico-s"></i></button>
+          <button class="ctool" id="t-hand" onclick="setTool('hand')" title="Pan (H)"><i data-lucide="hand" class="ico-s"></i></button>
+          <button class="ctool" id="t-connect" onclick="setTool('connect')" title="Connect (C)"><i data-lucide="git-merge" class="ico-s"></i></button>
+          <div class="tb-sep"></div>
+          <button class="ctool" onclick="addNode()" title="Add Scene"><i data-lucide="plus-circle" class="ico-s"></i></button>
+          <div class="tb-sep"></div>
+          <button class="ctool" onclick="adjZ(-0.1)" title="Zoom Out"><i data-lucide="zoom-out" class="ico-s"></i></button>
+          <span class="z-disp" id="zDisp">100%</span>
+          <button class="ctool" onclick="adjZ(0.1)" title="Zoom In"><i data-lucide="zoom-in" class="ico-s"></i></button>
+          <button class="ctool" onclick="resetV()" title="Fit (0)"><i data-lucide="maximize" class="ico-s"></i></button>
+        </div>
+
+        <div id="board">
+          <svg id="cvgsvg"><defs>
+            <marker id="ah-gold" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#F59E0B" opacity=".8"/></marker>
+            <marker id="ah-def" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="rgba(255,255,255,.18)"/></marker>
+          </defs></svg>
+        </div>
+
+        <canvas id="mmap" width="154" height="104"></canvas>
+
+        <div style="position:absolute;bottom:10px;left:10px;opacity:.45;pointer-events:none;font-size:.63rem;color:var(--t3)">
+          <span class="kbd">V</span> Select &nbsp;<span class="kbd">H</span> Pan &nbsp;<span class="kbd">C</span> Connect &nbsp;<span class="kbd">Scroll</span> Zoom &nbsp;<span class="kbd">Esc</span> Deselect
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREENPLAY -->
+    <div class="view" id="view-script">
+      <div class="scr-nav">
+        <div class="scr-nav-ttl">Scenes</div>
+        <div class="sni active" onclick="goScene('s1')"><div class="sni-num">SCENE 01</div>INT. Neon Coffee Shop — Night</div>
+        <div class="sni" onclick="goScene('s2')"><div class="sni-num">SCENE 02</div>EXT. Diner Alleyway — Night</div>
+        <div class="sni" onclick="goScene('s3')"><div class="sni-num">SCENE 03</div>INT. Picture Vehicle — Night</div>
+      </div>
+      <div class="scr-body" id="scrBody">
+        <div class="sp-doc">
+          <div class="sp-title">
+            <h1>Neon Echoes</h1>
+            <p>Written by A. Kubrick &amp; J. Villeneuve</p>
+            <p style="margin-top:4px;font-size:.73rem;color:var(--t3)">THIRD DRAFT · August 2, 2026 · 1.31 Pages · 3 Scenes</p>
+          </div>
+          <div id="s1">
+            <span class="stag">SCENE 01</span>
+            <div class="slug first">INT. NEON COFFEE SHOP — NIGHT</div>
+            <p class="aln">Flickering cyan neon tubes illuminate rain-streaked windows. Condensation drips down glass. A low HUM of city noise bleeds through the walls.</p>
+            <p class="aln">MAYA (28, wired, brilliant) hunches over a glowing terminal at the back booth. Code scrolls faster than most can read.</p>
+            <p class="aln">KAI (32, lean, military posture) slides into the booth opposite her. He places a heavy chrome PROP GUN onto the table, face down. The diner goes quiet.</p>
+            <div class="cname">MAYA</div><p class="paren">(not looking up)</p>
+            <p class="dial">You're twelve minutes late. The window closes in eight.</p>
+            <div class="cname">KAI</div>
+            <p class="dial">Traffic was monitored. Had to ghost three blocks.</p>
+            <div class="cname">MAYA</div>
+            <p class="dial">Then we have six minutes. Sit down and be quiet.</p>
+          </div>
+          <div id="s2" style="margin-top:28px">
+            <span class="stag">SCENE 02</span>
+            <div class="slug">EXT. DINER ALLEYWAY — NIGHT</div>
+            <p class="aln">RAIN hammers the asphalt. A blacked-out sedan idles at the alley mouth, engine barely a whisper.</p>
+            <p class="aln">Maya and Kai burst through the service exit — running hard. Behind them, AGENTS in tactical gear close fast.</p>
+            <div class="cname">KAI</div><p class="dial">Car!</p>
+            <div class="cname">MAYA</div><p class="paren">(panting)</p><p class="dial">I see it. Move!</p>
+          </div>
+          <div id="s3" style="margin-top:28px">
+            <span class="stag">SCENE 03</span>
+            <div class="slug">INT. PICTURE VEHICLE — NIGHT</div>
+            <p class="aln">The car SCREECHES into traffic. Maya jacks her terminal into the dashboard data port. Screens flicker — cascading data streams.</p>
+            <p class="aln">Kai drives with brutal focus. Rearview: three pursuit vehicles. Closing.</p>
+            <div class="cname">MAYA</div><p class="dial">Forty seconds. I need forty seconds.</p>
+            <div class="cname">KAI</div><p class="paren">(through gritted teeth)</p><p class="dial">I'll give you twenty. Figure out the math.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BREAKDOWN -->
+    <div class="view" id="view-breakdown">
+      <div class="bk-hdr"><i data-lucide="layers" class="ico" style="color:var(--gold)"></i><span class="bk-ttl">Script Breakdown — Neon Echoes</span><span style="margin-left:auto;font-size:.72rem;color:var(--t3)">3 scenes · AI-analyzed</span></div>
+      <div class="bk-body">
+        <div class="bk-card">
+          <div class="bk-ch" style="background:var(--sin);border-left:3px solid var(--sin-a)">
+            <span style="font-size:.65rem;font-weight:800;color:var(--sin-a)">SC.01 · INT/NIGHT</span>
+            <span class="bk-ct" style="margin-left:8px">Neon Coffee Shop</span>
+            <span style="font-size:.68rem;color:var(--t3)">0.31 pg</span>
+          </div>
+          <div class="bk-cb">
+            <div><div class="bk-cat-lbl">Cast</div><span class="etag et-cast">Maya</span><span class="etag et-cast">Kai</span></div>
+            <div><div class="bk-cat-lbl">Props</div><span class="etag et-prop">⚠ Prop Gun</span><span class="etag et-prop">Terminal</span><span class="etag et-prop">Chrome Case</span></div>
+            <div><div class="bk-cat-lbl">VFX / Lighting</div><span class="etag et-vfx">Cyan Neon Tubes</span><span class="etag et-vfx">Rain Projection</span></div>
+            <div><div class="bk-cat-lbl">Wardrobe</div><span class="etag et-ward">Maya Hacker Rig</span><span class="etag et-ward">Kai Tactical</span></div>
+            <div><div class="bk-cat-lbl">SFX / Sound</div><span class="etag et-sfx">City Hum BG</span><span class="etag et-sfx">Rain Practical</span></div>
+            <div><div class="bk-cat-lbl">Risk</div><span class="etag et-sfx">🔴 Prop Weapon</span></div>
+          </div>
+        </div>
+        <div class="bk-card">
+          <div class="bk-ch" style="background:var(--sen);border-left:3px solid var(--sen-a)">
+            <span style="font-size:.65rem;font-weight:800;color:var(--sen-a)">SC.02 · EXT/NIGHT</span>
+            <span class="bk-ct" style="margin-left:8px">Diner Alleyway</span>
+            <span style="font-size:.68rem;color:var(--t3)">0.25 pg</span>
+          </div>
+          <div class="bk-cb">
+            <div><div class="bk-cat-lbl">Cast</div><span class="etag et-cast">Maya</span><span class="etag et-cast">Kai</span><span class="etag et-cast">Agents ×4</span></div>
+            <div><div class="bk-cat-lbl">SFX</div><span class="etag et-sfx">⚠ Rain Machine</span><span class="etag et-sfx">Stunt Coord.</span></div>
+            <div><div class="bk-cat-lbl">Vehicles</div><span class="etag et-prop">Blacked-Out Sedan</span></div>
+            <div><div class="bk-cat-lbl">Locations</div><span class="etag et-vfx">Dock Alley Permit</span></div>
+            <div><div class="bk-cat-lbl">Wardrobe</div><span class="etag et-ward">Wet Weather All</span></div>
+            <div><div class="bk-cat-lbl">Risk</div><span class="etag et-sfx">🔴 Rain + Stunt</span></div>
+          </div>
+        </div>
+        <div class="bk-card">
+          <div class="bk-ch" style="background:var(--sin);border-left:3px solid var(--sin-a)">
+            <span style="font-size:.65rem;font-weight:800;color:var(--sin-a)">SC.03 · INT/NIGHT</span>
+            <span class="bk-ct" style="margin-left:8px">Picture Vehicle</span>
+            <span style="font-size:.68rem;color:var(--t3)">0.19 pg</span>
+          </div>
+          <div class="bk-cb">
+            <div><div class="bk-cat-lbl">Cast</div><span class="etag et-cast">Maya</span><span class="etag et-cast">Kai</span></div>
+            <div><div class="bk-cat-lbl">Vehicles</div><span class="etag et-prop">Sedan Cab Rig</span></div>
+            <div><div class="bk-cat-lbl">VFX</div><span class="etag et-vfx">Dashboard VFX</span><span class="etag et-vfx">BG City Plate</span></div>
+            <div><div class="bk-cat-lbl">Props</div><span class="etag et-prop">Hacking Terminal</span></div>
+            <div><div class="bk-cat-lbl">SFX</div><span class="etag et-sfx">Engine SFX</span></div>
+            <div><div class="bk-cat-lbl">Risk</div><span class="etag et-ward">🟢 Low Risk</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRIPBOARD -->
+    <div class="view" id="view-stripboard">
+      <div class="sb-hdr">
+        <i data-lucide="calendar-days" class="ico" style="color:var(--gold)"></i>
+        <span class="sb-ttl">2-Day Shooting Schedule — Neon Echoes</span>
+        <div class="legend">
+          <div class="leg-i"><div class="leg-s" style="background:var(--sid-a)"></div>INT Day</div>
+          <div class="leg-i"><div class="leg-s" style="background:var(--sed-a)"></div>EXT Day</div>
+          <div class="leg-i"><div class="leg-s" style="background:var(--sen-a)"></div>EXT Night</div>
+          <div class="leg-i"><div class="leg-s" style="background:var(--sin-a)"></div>INT Night</div>
+        </div>
+      </div>
+      <div class="sb-body">
+        <div class="sb-grid">
+          <div class="day-col">
+            <div class="day-hdr"><div><div>Day 1 — Monday</div><div class="day-sub">Aug 4 · Call: 06:30 · Dock District</div></div><span style="font-size:.68rem;color:var(--t3)">0.56 pg</span></div>
+            <div class="strip s-sin" onclick="openInsp(0)"><div class="strip-n">SC. 1</div><div class="strip-l">Neon Coffee Shop</div><div class="strip-m"><span>INT/NIGHT</span><span>·</span><span>0.31 pg</span><span>·</span><span>Maya, Kai</span></div></div>
+            <div class="strip s-sen" onclick="openInsp(1)"><div class="strip-n">SC. 2</div><div class="strip-l">Diner Alleyway</div><div class="strip-m"><span>EXT/NIGHT</span><span>·</span><span>0.25 pg</span><span>·</span><span>Maya, Kai, Agents</span></div></div>
+          </div>
+          <div class="day-col">
+            <div class="day-hdr"><div><div>Day 2 — Tuesday</div><div class="day-sub">Aug 5 · Call: 07:00 · Studio Lot</div></div><span style="font-size:.68rem;color:var(--t3)">0.19 pg</span></div>
+            <div class="strip s-sin" onclick="openInsp(2)"><div class="strip-n">SC. 3</div><div class="strip-l">Picture Vehicle</div><div class="strip-m"><span>INT/NIGHT</span><span>·</span><span>0.19 pg</span><span>·</span><span>Maya, Kai</span></div></div>
+          </div>
+        </div>
+        <div class="dood-sec">
+          <div class="dood-lbl">Day Out of Days (DOOD) — Cast Matrix</div>
+          <table class="dtbl">
+            <thead><tr><th style="text-align:left">Character / Actor</th><th>Day 1</th><th>Day 2</th><th>Total</th></tr></thead>
+            <tbody>
+              <tr><td style="text-align:left;color:var(--t1);font-weight:700">Maya / A. Portman</td><td class="d-sw">SW</td><td class="d-wf">WF</td><td style="color:var(--t2)">2W / 0H</td></tr>
+              <tr><td style="text-align:left;color:var(--t1);font-weight:700">Kai / C. Bale</td><td class="d-sw">SW</td><td class="d-wf">WF</td><td style="color:var(--t2)">2W / 0H</td></tr>
+              <tr><td style="text-align:left;color:var(--t1);font-weight:700">Agents ×4 / Day Players</td><td class="d-w">W</td><td>—</td><td style="color:var(--t2)">1W / 0H</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHOT LIST -->
+    <div class="view" id="view-shotlist">
+      <div class="sl-hdr">
+        <i data-lucide="camera" class="ico" style="color:var(--gold)"></i>
+        <span class="sl-ttl">Shot List — Neon Echoes</span>
+        <button class="fchip on">All</button>
+        <button class="fchip">Scene 1</button>
+        <button class="fchip">Scene 2</button>
+        <button class="fchip">Scene 3</button>
+        <span style="margin-left:auto"></span>
+        <button class="fchip">+ Add Shot</button>
+      </div>
+      <div class="sl-body">
+        <table class="stbl">
+          <thead><tr><th>#</th><th>Scene</th><th>Type</th><th>Angle</th><th>Movement</th><th>Lens</th><th>Description</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><span class="shot-n">1A</span></td><td style="color:var(--sin-a);font-weight:700">SC.1</td><td><span class="stype ty-ws">WS</span></td><td>Eye-Level</td><td>Static</td><td>28mm</td><td>Wide master. Establish neon atmosphere.</td><td><span class="sspill ss-ok">✓ Approved</span></td></tr>
+            <tr><td><span class="shot-n">1B</span></td><td style="color:var(--sin-a);font-weight:700">SC.1</td><td><span class="stype ty-ms">MS</span></td><td>Eye-Level</td><td>Dolly Push</td><td>50mm</td><td>Maya at terminal — rack focus to Kai entering.</td><td><span class="sspill ss-ok">✓ Approved</span></td></tr>
+            <tr><td><span class="shot-n">1C</span></td><td style="color:var(--sin-a);font-weight:700">SC.1</td><td><span class="stype ty-cu">CU</span></td><td>Slight Low</td><td>Static</td><td>85mm</td><td>Prop gun placed on table face-down.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">1D</span></td><td style="color:var(--sin-a);font-weight:700">SC.1</td><td><span class="stype ty-ecu">ECU</span></td><td>Eye-Level</td><td>Static</td><td>85mm</td><td>Insert: Maya's eyes — scanning, assessing.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">2A</span></td><td style="color:var(--sen-a);font-weight:700">SC.2</td><td><span class="stype ty-ws">WS</span></td><td>High Angle</td><td>Crane Down</td><td>24mm</td><td>Alley mouth. Sedan idles. Rain 80%.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">2B</span></td><td style="color:var(--sen-a);font-weight:700">SC.2</td><td><span class="stype ty-ms">MS</span></td><td>Low Angle</td><td>Handheld Track</td><td>35mm</td><td>Running — Maya &amp; Kai burst from exit.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">2C</span></td><td style="color:var(--sen-a);font-weight:700">SC.2</td><td><span class="stype ty-pov">POV</span></td><td>Eye-Level</td><td>Handheld</td><td>24mm</td><td>POV Agents — targets fleeing through rain.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">3A</span></td><td style="color:var(--sin-a);font-weight:700">SC.3</td><td><span class="stype ty-ms">MS</span></td><td>Dashboard POV</td><td>Rig Mount</td><td>35mm</td><td>Kai drives — rearview of pursuit vehicles.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">3B</span></td><td style="color:var(--sin-a);font-weight:700">SC.3</td><td><span class="stype ty-cu">CU</span></td><td>Low</td><td>Static</td><td>85mm</td><td>Maya jacks terminal into dash port.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+            <tr><td><span class="shot-n">3C</span></td><td style="color:var(--sin-a);font-weight:700">SC.3</td><td><span class="stype ty-ecu">ECU</span></td><td>Macro</td><td>Static</td><td>100mm</td><td>Dashboard screens flicker — data stream.</td><td><span class="sspill ss-plan">Planned</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BUDGET -->
+    <div class="view" id="view-budget">
+      <div class="bg-hdr">
+        <i data-lucide="dollar-sign" class="ico" style="color:var(--gold)"></i>
+        <span class="bg-ttl">Budget TopSheet — Neon Echoes</span>
+        <div class="bg-totals">
+          <div><div class="bg-tv">Total Est.</div><div class="bg-tval" style="color:var(--red)">$8,110</div></div>
+          <div><div class="bg-tv">Cap</div><div class="bg-tval" style="color:var(--grn)">$5,000</div></div>
+          <div><div class="bg-tv">Overage</div><div class="bg-tval" style="color:var(--red)">+$3,110</div></div>
+        </div>
+      </div>
+      <div class="bg-body">
+        <table class="btbl">
+          <thead><tr><th>Acct</th><th>Category</th><th>Description</th><th>Estimated</th><th>Cap</th><th>Variance</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr class="b-cat"><td>1000</td><td colspan="5">ABOVE-THE-LINE</td><td></td></tr>
+            <tr><td style="color:var(--t3)">1100</td><td>Writer Fee</td><td>Short-form WGA scale</td><td contenteditable>$500</td><td>$500</td><td class="under">$0</td><td><span class="sspill ss-ok">✓</span></td></tr>
+            <tr class="b-cat"><td>2000</td><td colspan="5">CAST & TALENT</td><td></td></tr>
+            <tr><td style="color:var(--t3)">2100</td><td>Lead Actors ×2</td><td>SAG Ultra Low Budget</td><td contenteditable>$2,000</td><td>$1,250</td><td class="over">+$750</td><td><span class="sspill" style="background:var(--red-d);color:var(--red)">⚠ Over</span></td></tr>
+            <tr><td style="color:var(--t3)">2200</td><td>Day Players ×4</td><td>Tactical Agents — 1 day</td><td contenteditable>$800</td><td>$800</td><td class="under">$0</td><td><span class="sspill ss-ok">✓</span></td></tr>
+            <tr class="b-cat"><td>3000</td><td colspan="5">LOCATIONS & PERMITS</td><td></td></tr>
+            <tr><td style="color:var(--t3)">3100</td><td>Diner Alleyway</td><td>Dock District permit + fee</td><td contenteditable>$3,000</td><td>$1,250</td><td class="over">+$1,750</td><td><span class="sspill" style="background:var(--red-d);color:var(--red)">⚠ Over</span></td></tr>
+            <tr class="b-cat"><td>4000</td><td colspan="5">PRODUCTION & SFX</td><td></td></tr>
+            <tr><td style="color:var(--t3)">4100</td><td>Rain Machine</td><td>1-day rental + operator</td><td contenteditable>$410</td><td>$400</td><td class="over">+$10</td><td><span class="sspill ss-plan">Pending</span></td></tr>
+            <tr><td style="color:var(--t3)">4200</td><td>Prop Weapon</td><td>Licensed gun + armorer 2-day</td><td contenteditable>$400</td><td>$400</td><td class="under">$0</td><td><span class="sspill ss-ok">✓</span></td></tr>
+            <tr class="b-cat"><td>8000</td><td colspan="5">CONTINGENCY</td><td></td></tr>
+            <tr><td style="color:var(--t3)">8100</td><td>10% Contingency</td><td>Auto-calculated</td><td>$700</td><td>$400</td><td class="over">+$300</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CALL SHEET -->
+    <div class="view" id="view-callsheet">
+      <div class="cs-doc">
+        <div class="cs-banner">
+          <div><div class="cs-prod">NEON ECHOES — Official Call Sheet</div><div class="cs-day">Shoot Day 1 of 2 · Monday, August 4, 2026</div></div>
+          <div style="text-align:right"><div style="font-size:.68rem;color:var(--t3)">Rev. 3 · Issued 17:00</div><button class="btn-gold" style="margin-top:6px" onclick="window.print()"><i data-lucide="printer" class="ico-s"></i>Print</button></div>
+        </div>
+        <div class="cs-sec">
+          <div class="cs-sec-ttl">General Production Info</div>
+          <div class="cs-grid">
+            <div><div class="cs-f-lbl">Production Co.</div><div class="cs-f-val">CinemaLit Pictures</div></div>
+            <div><div class="cs-f-lbl">Director</div><div class="cs-f-val">A. Kubrick</div></div>
+            <div><div class="cs-f-lbl">1st AD</div><div class="cs-f-val">M. DePalma</div></div>
+            <div><div class="cs-f-lbl">DP / Camera</div><div class="cs-f-val">J. Deakins</div></div>
+            <div><div class="cs-f-lbl">Crew Call</div><div class="cs-f-val" style="color:var(--gold)">06:30 AM</div></div>
+            <div><div class="cs-f-lbl">First Shot</div><div class="cs-f-val">08:00 AM</div></div>
+            <div><div class="cs-f-lbl">Set Address</div><div class="cs-f-val">9 Dock Street, Warehouse District</div></div>
+            <div><div class="cs-f-lbl">Nearest Hospital</div><div class="cs-f-val" style="color:var(--red)">City General ER — 0.8 mi · (555) 019-2831</div></div>
+            <div><div class="cs-f-lbl">Weather</div><div class="cs-f-val">🌧 58°F, Rain (use practical for Sc.2!)</div></div>
+          </div>
+        </div>
+        <div class="cs-sec">
+          <div class="cs-sec-ttl">Cast Call Times</div>
+          <table class="cctbl">
+            <thead><tr><th>Character</th><th>Actor</th><th>Makeup</th><th>Wardrobe</th><th>Set Call</th><th>Scenes</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:700;color:var(--t1)">Maya</td><td>A. Portman</td><td>06:30</td><td>07:00</td><td style="color:var(--gold);font-weight:700">08:00</td><td>1, 2</td></tr>
+              <tr><td style="font-weight:700;color:var(--t1)">Kai</td><td>C. Bale</td><td>07:00</td><td>07:30</td><td style="color:var(--gold);font-weight:700">08:30</td><td>1, 2</td></tr>
+              <tr><td style="font-weight:700;color:var(--t1)">Agents ×4</td><td>Day Players</td><td>09:00</td><td>09:30</td><td style="color:var(--gold);font-weight:700">10:00</td><td>2</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cs-sec" style="border-bottom:none">
+          <div class="cs-sec-ttl">Today's Scenes</div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="background:var(--sin);border-left:3px solid var(--sin-a);border-radius:5px;padding:7px 11px"><div style="font-size:.68rem;font-weight:800;color:var(--sin-a)">SC.1 — INT. NEON COFFEE SHOP — NIGHT</div><div style="font-size:.76rem;color:var(--t2);margin-top:2px">0.31 pages · Maya, Kai · ⚠ Prop Gun on set</div></div>
+            <div style="background:var(--sen);border-left:3px solid var(--sen-a);border-radius:5px;padding:7px 11px"><div style="font-size:.68rem;font-weight:800;color:var(--sen-a)">SC.2 — EXT. DINER ALLEYWAY — NIGHT</div><div style="font-size:.76rem;color:var(--t2);margin-top:2px">0.25 pages · Maya, Kai, Agents ×4 · ⚠ Rain Machine + Stunt Coord.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLICKHOUSE SQL -->
+    <div class="view" id="view-sql">
+      <div class="sql-side">
+        <div class="sql-side-ttl">ClickHouse Cloud</div>
+        <div style="font-size:.67rem;color:var(--grn);margin-bottom:10px;display:flex;align-items:center;gap:4px"><span style="width:5px;height:5px;border-radius:50%;background:var(--grn);display:inline-block"></span>Connected · 3.8ms</div>
+        <div class="sql-side-ttl" style="margin-top:6px">Tables</div>
+        <div class="dbi" onclick="lq('scenes')"><i data-lucide="table-2" class="ico-s" style="color:var(--cyan)"></i>scenes</div>
+        <div class="dbi" onclick="lq('shots')"><i data-lucide="table-2" class="ico-s" style="color:var(--cyan)"></i>shots</div>
+        <div class="dbi" onclick="lq('budget')"><i data-lucide="table-2" class="ico-s" style="color:var(--cyan)"></i>budget_items</div>
+        <div class="dbi" onclick="lq('cast')"><i data-lucide="table-2" class="ico-s" style="color:var(--cyan)"></i>cast_availability</div>
+        <div class="dbi" onclick="lq('memory')"><i data-lucide="table-2" class="ico-s" style="color:var(--cyan)"></i>agent_memory</div>
+      </div>
+      <div class="sql-main">
+        <div class="sql-ed-area"><textarea class="sql-ed" id="sqlEd">SELECT scene_id, slugline, page_count, risk_level
+FROM scenes
+WHERE production = 'neon_echoes'
+ORDER BY shoot_day ASC, scene_number ASC;</textarea></div>
+        <div class="sql-tb">
+          <button class="btn-run" onclick="runSQL()"><i data-lucide="play" class="ico-s"></i>Run Query</button>
+          <span style="font-size:.7rem;color:var(--t3);margin-left:6px" id="sqlStat">3 rows · 3.8ms</span>
+        </div>
+        <div class="sql-res">
+          <table class="srtbl"><thead><tr><th>scene_id</th><th>slugline</th><th>page_count</th><th>risk_level</th></tr></thead>
+          <tbody id="sqlBody">
+            <tr><td>sc_001</td><td>INT. NEON COFFEE SHOP — NIGHT</td><td>0.31</td><td style="color:var(--red);font-weight:700">HIGH</td></tr>
+            <tr><td>sc_002</td><td>EXT. DINER ALLEYWAY — NIGHT</td><td>0.25</td><td style="color:var(--red);font-weight:700">HIGH</td></tr>
+            <tr><td>sc_003</td><td>INT. PICTURE VEHICLE — NIGHT</td><td>0.19</td><td style="color:var(--grn);font-weight:700">LOW</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /wsc -->
+
+  <!-- STATUS BAR -->
+  <div id="sbar">
+    <div class="si"><i data-lucide="film" class="ico-s" style="color:var(--gold)"></i><strong id="sbView">Scene Flow Board</strong></div>
+    <span class="ss">·</span>
+    <div class="si">Tool: <strong id="sbTool">Select</strong></div>
+    <span class="ss">·</span>
+    <div class="si">Nodes: <strong id="sbNodes">3</strong></div>
+    <span class="ss">·</span>
+    <div class="si">Zoom: <strong id="sbZoom">100%</strong></div>
+    <div class="sr">
+      <div class="si"><i data-lucide="database" class="ico-s" style="color:var(--cyan)"></i>ClickHouse: <strong style="color:var(--cyan)">3.8ms</strong></div>
+      <div class="si"><i data-lucide="bot" class="ico-s" style="color:var(--gold)"></i>Agents: <strong style="color:var(--gold)">Active</strong></div>
+    </div>
+  </div>
+</main>
+
+<!-- INSPECTOR PANEL -->
+<aside id="insp">
+  <div class="insp-hdr">
+    <span class="insp-ttl" id="inspTtl">Scene Inspector</span>
+    <button class="btn-ico" onclick="closeInsp()"><i data-lucide="x" class="ico-s"></i></button>
+  </div>
+  <div class="itabs">
+    <div class="itab active" onclick="iTab(this,'info')">Info</div>
+    <div class="itab" onclick="iTab(this,'elems')">Elements</div>
+    <div class="itab" onclick="iTab(this,'shots')">Shots</div>
+    <div class="itab" onclick="iTab(this,'ai')">AI</div>
+  </div>
+  <div class="ibody" id="inspBody">
+    <div style="color:var(--t3);font-size:.78rem;text-align:center;margin-top:40px">
+      <i data-lucide="mouse-pointer-2" style="width:22px;height:22px;display:block;margin:0 auto 9px"></i>
+      Click a scene node to inspect
+    </div>
+  </div>
+</aside>
+
+</div><!-- /wb -->
+
+<script>
+lucide.createIcons();
+
+// ── DATA ──
+const scenes=[
+  {id:'sn0',num:'01',slug:'INT. NEON COFFEE SHOP — NIGHT',type:'INT',time:'NIGHT',loc:'Neon Coffee Shop',pg:'0.31',cast:['Maya','Kai'],shots:4,risk:'high',rn:'Prop Weapon on set — armorer required',day:1,nh:'nh-sin',nb:'b-sin',bt:'INT·NIGHT',x:100,y:160,desc:'Maya and Kai meet covertly.',props:['Prop Gun (licensed)','Glowing Terminal','Chrome Case'],ward:['Maya Hacker Rig','Kai Tactical'],vfx:['Cyan Neon Tubes','Rain Projection'],sfx:['City Hum BG','Rain Practical']},
+  {id:'sn1',num:'02',slug:'EXT. DINER ALLEYWAY — NIGHT',type:'EXT',time:'NIGHT',loc:'Diner Alleyway',pg:'0.25',cast:['Maya','Kai','Agents ×4'],shots:3,risk:'high',rn:'Rain machine + stunt coordinator required',day:1,nh:'nh-sen',nb:'b-sen',bt:'EXT·NIGHT',x:400,y:160,desc:'Rain-soaked chase. Stunt work.',props:['Blacked-Out Sedan','Tactical Gear ×4'],ward:['Wet Weather — All Cast'],vfx:['BG Rain Enhancement'],sfx:['Rain Machine','Tire Screech']},
+  {id:'sn2',num:'03',slug:'INT. PICTURE VEHICLE — NIGHT',type:'INT',time:'NIGHT',loc:'Picture Vehicle',pg:'0.19',cast:['Maya','Kai'],shots:3,risk:'low',rn:'Low risk — studio lot car rig',day:2,nh:'nh-sin',nb:'b-sin',bt:'INT·NIGHT',x:700,y:160,desc:'Kai drives while Maya hacks the system.',props:['Sedan Interior Rig','Hacking Terminal'],ward:['Continuation from Sc.1'],vfx:['Dashboard Screen VFX','BG City Plate'],sfx:['Engine SFX','Keyboard Clicks']}
+];
+const conns=[{f:'sn0',t:'sn1'},{f:'sn1',t:'sn2'}];
+
+// ── CANVAS STATE ──
+let px=60,py=60,zoom=1,tool='select',dragCard=null,dragCvs=false;
+let dsx=0,dsy=0,csx=0,csy=0,psx=0,psy=0;
+let selId=null,connFrom=null,spaceDown=false,inspOpen=false,curITab='info';
+
+// ── RENDER NODES ──
+function render(){
+  const board=document.getElementById('board');
+  board.querySelectorAll('.snode').forEach(n=>n.remove());
+  scenes.forEach((sc,i)=>{
+    const el=document.createElement('div');
+    el.className='snode';el.id=sc.id;
+    el.style.cssText=`left:${sc.x}px;top:${sc.y}px`;
+    const rp=sc.risk==='high'?`<span class="rpill r-hi">HIGH</span>`:sc.risk==='med'?`<span class="rpill r-md">MED</span>`:`<span class="rpill r-lo">LOW</span>`;
+    const cc=sc.cast.map(c=>`<span class="cc">${c}</span>`).join('');
+    el.innerHTML=`<div class="nh ${sc.nh}"><div class="n-num">SC.${sc.num}</div><div class="n-badge ${sc.nb}">${sc.bt}</div></div><div class="nbody"><div class="n-loc">${sc.loc}</div><div class="n-meta"><span>${sc.pg}pg</span><span class="mdot"></span><span>Day ${sc.day}</span><span class="mdot"></span><span>${sc.shots} shots</span></div><div class="n-cast">${cc}</div></div><div class="nfoot">${rp}<span class="n-pg">${sc.pg}p</span></div>`;
+    el.addEventListener('mousedown',e=>nMD(e,i));
+    el.addEventListener('click',e=>nClick(e,i));
+    board.appendChild(el);
+  });
+  lucide.createIcons();
+  applyT();drawConns();drawMM();
+}
+
+function applyT(){
+  document.getElementById('board').style.transform=`translate(${px}px,${py}px) scale(${zoom})`;
+  const zs=Math.round(zoom*100)+'%';
+  document.getElementById('zDisp').textContent=zs;
+  document.getElementById('sbZoom').textContent=zs;
+}
+
+// ── SVG CONNECTORS ──
+function drawConns(){
+  const svg=document.getElementById('cvgsvg');
+  svg.querySelectorAll('path').forEach(p=>p.remove());
+  conns.forEach(c=>{
+    const f=scenes.find(s=>s.id===c.f),t=scenes.find(s=>s.id===c.t);
+    if(!f||!t)return;
+    const x1=f.x+220,y1=f.y+75,x2=t.x,y2=t.y+75;
+    const mx=(x1+x2)/2;
+    const sel=(c.f===selId||c.t===selId);
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`);
+    path.setAttribute('stroke',sel?'#F59E0B':'rgba(255,255,255,.16)');
+    path.setAttribute('stroke-width',sel?'2.5':'1.5');
+    path.setAttribute('fill','none');
+    path.setAttribute('marker-end',sel?'url(#ah-gold)':'url(#ah-def)');
+    svg.appendChild(path);
+  });
+}
+
+// ── MINIMAP ──
+function drawMM(){
+  const cv=document.getElementById('mmap');
+  if(!cv)return;
+  const ctx=cv.getContext('2d'),W=154,H=104,BW=4000,BH=3000;
+  const sx=W/BW,sy=H/BH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(9,9,14,.85)';ctx.fillRect(0,0,W,H);
+  conns.forEach(c=>{
+    const f=scenes.find(s=>s.id===c.f),t=scenes.find(s=>s.id===c.t);
+    if(!f||!t)return;
+    ctx.strokeStyle='rgba(255,255,255,.1)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo((f.x+220)*sx,(f.y+75)*sy);ctx.lineTo(t.x*sx,(t.y+75)*sy);ctx.stroke();
+  });
+  scenes.forEach(sc=>{
+    ctx.fillStyle=sc.id===selId?'rgba(245,158,11,.55)':'rgba(35,35,55,.9)';
+    ctx.strokeStyle=sc.id===selId?'#F59E0B':'rgba(255,255,255,.18)';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(sc.x*sx,sc.y*sy,220*sx,140*sy,2);ctx.fill();ctx.stroke();
+  });
+  const cont=document.getElementById('cvArea');
+  const vpx=(-px/zoom)*sx,vpy=(-py/zoom)*sy,vpw=(cont.clientWidth/zoom)*sx,vph=(cont.clientHeight/zoom)*sy;
+  ctx.strokeStyle='rgba(245,158,11,.65)';ctx.fillStyle='rgba(245,158,11,.05)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(Math.max(0,vpx),Math.max(0,vpy),Math.min(W,vpw),Math.min(H,vph),2);ctx.fill();ctx.stroke();
+}
+
+// ── CANVAS EVENTS ──
+function cvWheel(e){
+  e.preventDefault();
+  const d=e.deltaY<0?0.1:-0.1;
+  const cont=document.getElementById('cvArea');
+  const r=cont.getBoundingClientRect();
+  const cx=e.clientX-r.left,cy=e.clientY-r.top;
+  const oz=zoom;
+  zoom=Math.max(.2,Math.min(3,zoom+d));
+  px=cx-(cx-px)*(zoom/oz);py=cy-(cy-py)*(zoom/oz);
+  applyT();drawConns();drawMM();
+}
+function cvMD(e){
+  if(e.target.closest('.snode')||e.target.closest('#cvtb')||e.target.closest('#mmap'))return;
+  if(tool==='hand'||spaceDown){
+    dragCvs=true;psx=e.clientX-px;psy=e.clientY-py;
+    document.getElementById('cvArea').style.cursor='grabbing';e.preventDefault();
+  }
+}
+function cvMM(e){
+  if(dragCvs){px=e.clientX-psx;py=e.clientY-psy;applyT();drawConns();drawMM();}
+  if(dragCard!==null){
+    const dx=(e.clientX-dsx)/zoom,dy=(e.clientY-dsy)/zoom;
+    scenes[dragCard].x=csx+dx;scenes[dragCard].y=csy+dy;
+    const el=document.getElementById(scenes[dragCard].id);
+    if(el){el.style.left=scenes[dragCard].x+'px';el.style.top=scenes[dragCard].y+'px';}
+    drawConns();drawMM();
+  }
+}
+function cvMU(){
+  dragCvs=false;dragCard=null;
+  const c=document.getElementById('cvArea');
+  if(c)c.style.cursor=tool==='hand'?'grab':tool==='connect'?'crosshair':'default';
+}
+
+// ── NODE EVENTS ──
+function nMD(e,i){
+  if(tool==='hand'||spaceDown)return;
+  if(e.target.getAttribute('contenteditable')==='true')return;
+  if(tool==='connect'){
+    const sid=scenes[i].id;
+    if(!connFrom){connFrom=sid;document.getElementById(sid).style.borderColor='var(--cyan)';}
+    else if(connFrom!==sid){
+      if(!conns.some(c=>c.f===connFrom&&c.t===sid))conns.push({f:connFrom,t:sid});
+      document.getElementById(connFrom).style.borderColor='';connFrom=null;drawConns();
+    }
+    e.stopPropagation();return;
+  }
+  dragCard=i;dsx=e.clientX;dsy=e.clientY;csx=scenes[i].x;csy=scenes[i].y;
+  e.stopPropagation();e.preventDefault();
+}
+function nClick(e,i){
+  if(dragCard!==null)return;
+  if(tool==='connect')return;
+  selId=scenes[i].id;
+  document.querySelectorAll('.snode').forEach(n=>n.classList.remove('sel'));
+  const el=document.getElementById(selId);if(el)el.classList.add('sel');
+  openInsp(i);drawConns();e.stopPropagation();
+}
+
+// ── INSPECTOR ──
+function openInsp(i){
+  const sc=scenes[i];
+  document.getElementById('inspTtl').textContent=`SC.${sc.num} Inspector`;
+  renderITab(i,curITab);
+  document.getElementById('insp').classList.add('open');
+  inspOpen=true;
+}
+function closeInsp(){
+  document.getElementById('insp').classList.remove('open');
+  inspOpen=false;selId=null;
+  document.querySelectorAll('.snode').forEach(n=>n.classList.remove('sel'));
+  drawConns();
+}
+function togInsp(){inspOpen?closeInsp():(scenes.length&&openInsp(0));}
+function iTab(el,tab){
+  document.querySelectorAll('.itab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');curITab=tab;
+  const i=scenes.findIndex(s=>s.id===selId);
+  if(i>=0)renderITab(i,tab);
+}
+function renderITab(i,tab){
+  const sc=scenes[i],body=document.getElementById('inspBody');
+  if(tab==='info'){
+    body.innerHTML=`
+      <div class="ifg"><div class="ig-ttl">Scene Info</div>
+        <div class="ifield"><span class="ilbl">Scene #</span><span class="ival">SC.${sc.num}</span></div>
+        <div class="ifield"><span class="ilbl">Slugline</span><span class="ival" style="font-size:.68rem;font-family:var(--mono)">${sc.slug}</span></div>
+        <div class="ifield"><span class="ilbl">Type</span><span class="ival">${sc.type} · ${sc.time}</span></div>
+        <div class="ifield"><span class="ilbl">Location</span><span class="ival">${sc.loc}</span></div>
+        <div class="ifield"><span class="ilbl">Pages</span><span class="ival">${sc.pg}</span></div>
+        <div class="ifield"><span class="ilbl">Shoot Day</span><span class="ival">Day ${sc.day}</span></div>
+      </div>
+      <div class="ifg"><div class="ig-ttl">Cast</div><div class="itag-list">${sc.cast.map(c=>`<span class="etag et-cast">${c}</span>`).join('')}</div></div>
+      <div class="ifg"><div class="ig-ttl">Risk</div>
+        <div class="ifield"><span class="ilbl">Level</span><span class="ival"><span class="rpill ${sc.risk==='high'?'r-hi':sc.risk==='med'?'r-md':'r-lo'}">${sc.risk.toUpperCase()}</span></span></div>
+        <div style="font-size:.72rem;color:var(--t3);margin-top:3px">${sc.rn}</div>
+      </div>
+      <div class="ifg"><div class="ig-ttl">Production Scores</div>
+        <div class="sbar-row"><span class="sbar-lbl">Complexity</span><div class="sbar-tr"><div class="sbar-fill" style="width:${sc.risk==='high'?80:40}%;background:var(--red)"></div></div><span class="sbar-v">${sc.risk==='high'?'8':'4'}/10</span></div>
+        <div class="sbar-row"><span class="sbar-lbl">Budget Fit</span><div class="sbar-tr"><div class="sbar-fill" style="width:${sc.risk==='high'?35:92}%;background:${sc.risk==='high'?'var(--red)':'var(--grn)'}"></div></div><span class="sbar-v">${sc.risk==='high'?'3':'9'}/10</span></div>
+        <div class="sbar-row"><span class="sbar-lbl">Logistic Ease</span><div class="sbar-tr"><div class="sbar-fill" style="width:${sc.risk==='low'?88:48}%;background:${sc.risk==='low'?'var(--grn)':'var(--gold)'}"></div></div><span class="sbar-v">${sc.risk==='low'?'8':'5'}/10</span></div>
+      </div>`;
+  }else if(tab==='elems'){
+    body.innerHTML=`
+      <div class="ifg"><div class="ig-ttl">Props</div><div class="itag-list">${sc.props.map(p=>`<span class="etag et-prop">${p}</span>`).join('')}</div></div>
+      <div class="ifg"><div class="ig-ttl">Wardrobe</div><div class="itag-list">${sc.ward.map(w=>`<span class="etag et-ward">${w}</span>`).join('')}</div></div>
+      <div class="ifg"><div class="ig-ttl">VFX</div><div class="itag-list">${sc.vfx.map(v=>`<span class="etag et-vfx">${v}</span>`).join('')}</div></div>
+      <div class="ifg"><div class="ig-ttl">SFX / Sound</div><div class="itag-list">${sc.sfx.map(s=>`<span class="etag et-sfx">${s}</span>`).join('')}</div></div>`;
+  }else if(tab==='shots'){
+    body.innerHTML=`<div class="ifg"><div class="ig-ttl">Shots — SC.${sc.num}</div><div style="font-size:.72rem;color:var(--t3);margin-bottom:9px">${sc.shots} shots planned</div>
+      ${Array.from({length:sc.shots},(_,j)=>`<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:5px;padding:7px 9px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:.72rem;font-weight:800;color:var(--t1)">${sc.num}${String.fromCharCode(65+j)}</span><span class="sspill ${j<2?'ss-ok':'ss-plan'}">${j<2?'✓ Approved':'Planned'}</span></div>`).join('')}
+      <button class="fchip on" style="margin-top:7px" onclick="sv('shotlist')">Open Full Shot List →</button></div>`;
+  }else if(tab==='ai'){
+    body.innerHTML=`
+      <div class="ai-box"><div class="ai-box-ttl">⚡ Director Engine Analysis</div>
+        <div class="ai-box-txt">${sc.risk==='high'?`Scene ${sc.num} has HIGH risk. Suggest: (1) Consolidate rain locations — save ~$800. (2) Block armorer for both prop-weapon days together. (3) Weather contingency plan needed.`:`Scene ${sc.num} is LOW risk and budget-compliant. Recommend scheduling on Day 2 as a safety buffer if Day 1 runs over.`}</div>
+      </div>
+      <div class="ifg" style="margin-top:12px"><div class="ig-ttl">AI Suggestions</div>
+        <div style="display:flex;flex-direction:column;gap:5px;font-size:.73rem">
+          ${sc.risk==='high'?`<div style="padding:7px 9px;background:var(--red-d);border-radius:5px;color:var(--red)">⚠ Budget overrun detected on this scene</div><div style="padding:7px 9px;background:var(--gold-d);border-radius:5px;color:var(--gold)">💡 Merge rain VFX with practical weather forecast</div><div style="padding:7px 9px;background:var(--cyan-d);border-radius:5px;color:var(--cyan)">🤖 3 similar productions in ClickHouse memory — query?</div>`:`<div style="padding:7px 9px;background:var(--grn-d);border-radius:5px;color:var(--grn)">✓ Scene within all parameters — ready to lock</div><div style="padding:7px 9px;background:var(--cyan-d);border-radius:5px;color:var(--cyan)">🤖 Load similar car scene reference data?</div>`}
+        </div>
+      </div>`;
+  }
+  lucide.createIcons();
+}
+
+// ── TOOLS ──
+function setTool(t){
+  tool=t;connFrom=null;
+  document.querySelectorAll('.ctool').forEach(b=>b.classList.remove('active'));
+  const b=document.getElementById('t-'+t);if(b)b.classList.add('active');
+  document.getElementById('sbTool').textContent=t.charAt(0).toUpperCase()+t.slice(1);
+  const cv=document.getElementById('cvArea');
+  if(cv)cv.style.cursor=t==='hand'?'grab':t==='connect'?'crosshair':'default';
+}
+function adjZ(d){zoom=Math.max(.2,Math.min(3,zoom+d));applyT();drawConns();drawMM();}
+function resetV(){px=60;py=60;zoom=1;applyT();drawConns();drawMM();}
+function addNode(){
+  const last=scenes[scenes.length-1];
+  const n={id:'sn'+scenes.length,num:String(scenes.length+1).padStart(2,'0'),slug:'INT. NEW LOCATION — DAY',type:'INT',time:'DAY',loc:`New Location ${scenes.length+1}`,pg:'0.25',cast:['TBD'],shots:0,risk:'low',rn:'No flags',day:1,nh:'nh-sid',nb:'b-sid',bt:'INT·DAY',x:last.x+320,y:last.y+40,desc:'',props:[],ward:[],vfx:[],sfx:[]};
+  conns.push({f:last.id,t:n.id});scenes.push(n);
+  document.getElementById('sbNodes').textContent=scenes.length;
+  render();
+}
+
+// ── VIEW ROUTER ──
+const vnames={canvas:'Scene Flow Board',script:'Screenplay Reader',breakdown:'Script Breakdown',stripboard:'Stripboard & Schedule',shotlist:'Shot List',budget:'Budget TopSheet',callsheet:'DGA Call Sheet',sql:'ClickHouse SQL'};
+function sv(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.ws-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-itm').forEach(n=>n.classList.remove('active'));
+  const vp=document.getElementById('view-'+id);if(vp)vp.classList.add('active');
+  const tb=document.getElementById('tab-'+id);if(tb)tb.classList.add('active');
+  const ni=document.getElementById('nav-'+id);if(ni)ni.classList.add('active');
+  const cvtb=document.getElementById('cvtb'),mm=document.getElementById('mmap');
+  if(id==='canvas'){cvtb.style.display='flex';mm.style.display='block';setTimeout(()=>{drawConns();drawMM();},50);}
+  else{cvtb.style.display='none';mm.style.display='none';}
+  document.getElementById('sbView').textContent=vnames[id]||id;
+}
+
+// ── KEYBOARD ──
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.target.isContentEditable)return;
+  if(e.code==='Space'&&!spaceDown){spaceDown=true;const cv=document.getElementById('cvArea');if(cv)cv.style.cursor='grab';e.preventDefault();}
+  switch(e.key.toLowerCase()){
+    case 'v':setTool('select');break;
+    case 'h':setTool('hand');break;
+    case 'c':setTool('connect');break;
+    case 'escape':closeInsp();setTool('select');selId=null;connFrom=null;document.querySelectorAll('.snode').forEach(n=>n.classList.remove('sel'));drawConns();break;
+    case '+':case '=':adjZ(.1);break;
+    case '-':adjZ(-.1);break;
+    case '0':resetV();break;
+  }
+});
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space'){spaceDown=false;const cv=document.getElementById('cvArea');if(cv&&tool!=='hand')cv.style.cursor='default';}
+});
+
+// ── AGENT CAPSULE ──
+let micOn=false;
+function capKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();capSend();}}
+function capSend(){const v=document.getElementById('agentInput').value.trim();if(!v)return;document.getElementById('agentInput').value='';}
+function capAttach(){document.getElementById('agentInput').value='[Attached: Neon_Echoes_v3.fountain] ';document.getElementById('agentInput').focus();}
+function capMic(){micOn=!micOn;const b=document.getElementById('micBtn');b.classList.toggle('mic-on',micOn);document.getElementById('agentInput').placeholder=micOn?'🎙 Listening…':'Ask Director Agent…';if(!micOn)document.getElementById('agentInput').value='Consolidate rain scene locations to cut budget.';}
+
+// ── SQL ──
+const sqls={scenes:"SELECT scene_id, slugline, page_count, risk_level\nFROM scenes\nWHERE production = 'neon_echoes'\nORDER BY shoot_day ASC;",shots:"SELECT shot_id, scene_id, shot_type, lens, movement\nFROM shots\nWHERE production = 'neon_echoes';",budget:"SELECT category, estimated_cost, cap, variance\nFROM budget_items\nWHERE production = 'neon_echoes';",cast:"SELECT character_name, actor, sw_day, wf_day, total_days\nFROM cast_availability\nWHERE production = 'neon_echoes';",memory:"SELECT query, result, timestamp\nFROM agent_memory\nORDER BY timestamp DESC LIMIT 10;"};
+function lq(t){document.getElementById('sqlEd').value=sqls[t]||'';}
+function runSQL(){const s=document.getElementById('sqlStat');s.textContent='Running…';setTimeout(()=>{s.textContent='3 rows · 4.1ms';},400);}
+
+// ── MISC ──
+function exportBinder(){window.open('greenlight_package.html','_blank');}
+function togFS(){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+function goScene(id){const el=document.getElementById(id);if(el){el.scrollIntoView({behavior:'smooth'});document.querySelectorAll('.sni').forEach(n=>n.classList.remove('active'));const ni=el.closest('.sp-doc')?.querySelector(`[onclick="goScene('${id}')"]`)||document.querySelector(`[onclick="goScene('${id}')"]`);if(ni)ni.classList.add('active');}}
+
+// ── INIT ──
+window.addEventListener('load',()=>{render();sv('canvas');lucide.createIcons();});
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+/* src/components/canvas/CanvasToolbar.module.css */
+.toolbar {
+  position: absolute; top: 12px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(17,17,24,.93);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-hi);
+  border-radius: 36px; padding: 4px 9px;
+  display: flex; align-items: center; gap: 3px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.65);
+  z-index: 50;
+}
+.btn {
+  width: 30px; height: 30px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t2); transition: all .14s;
+}
+.btn:hover { background: var(--bg-hover); color: var(--t1); }
+.active { background: var(--gold) !important; color: #000 !important; }
+.sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+.zoomText { font-size: .7rem; font-weight: 700; color: var(--t2); min-width: 38px; text-align: center; }

@@ -1,0 +1,115 @@
+/* src/components/canvas/SceneNode.module.css */
+.node {
+  position: absolute; width: 220px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 11px; cursor: grab;
+  user-select: none; overflow: hidden;
+  transition: box-shadow .15s, border-color .15s;
+}
+.node:active { cursor: grabbing; }
+.node:hover { border-color: var(--border-hi); box-shadow: 0 8px 28px rgba(0,0,0,.55); }
+.selected { border-color: var(--gold) !important; box-shadow: 0 0 0 2px rgba(245,158,11,.28), 0 8px 28px rgba(0,0,0,.55) !important; }
+.connectFrom { border-color: var(--cyan) !important; box-shadow: 0 0 0 2px rgba(6,182,212,.28) !important; }
+
+/* NODE ACTION BAR */
+.nodeActionBar {
+  position: absolute;
+  top: -28px;
+  right: 0;
+  display: flex;
+  gap: 3px;
+  background: rgba(17, 17, 24, 0.95);
+  border: 1px solid var(--border-hi);
+  border-radius: 5px;
+  padding: 2px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.nodeActBtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t2);
+  transition: all .14s;
+}
+.nodeActBtn:hover { background: var(--bg-hover); color: var(--gold); }
+.dangerAct:hover { background: var(--red-d); color: var(--red); }
+
+.header {
+  height: 52px; display: flex; align-items: flex-end;
+  justify-content: space-between; padding: 7px 9px; position: relative;
+}
+.header::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 20%, rgba(0,0,0,.45));
+  pointer-events: none;
+}
+.hdrSin { background: linear-gradient(135deg, #1A1A2E, #252540); }
+.hdrSen { background: linear-gradient(135deg, #0E1829, #172540); }
+.hdrSed { background: linear-gradient(135deg, #2E2A10, #40380A); }
+.hdrSid { background: linear-gradient(135deg, #1C1C0E, #30301A); }
+
+.sceneNum {
+  font-size: .62rem; font-weight: 800; letter-spacing: .07em;
+  color: rgba(255,255,255,.85); position: relative; z-index: 1;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+.badge {
+  font-size: .59rem; font-weight: 800; letter-spacing: .05em;
+  padding: 2px 5px; border-radius: 3px; position: relative; z-index: 1;
+}
+.badgeSin { background: rgba(74,222,128,.18); color: #4ADE80; }
+.badgeSen { background: rgba(96,165,250,.18); color: #60A5FA; }
+.badgeSed { background: rgba(245,158,11,.18); color: #F59E0B; }
+.badgeSid { background: rgba(229,216,122,.18); color: #E5D87A; }
+
+.body { padding: 9px 9px 7px; display: flex; flex-direction: column; gap: 4px; }
+.loc { font-size: .76rem; font-weight: 600; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.editLocRow {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.editLocInput {
+  background: var(--bg-hover);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  color: var(--t1);
+  font-size: .74rem;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+}
+.saveLocBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--gold);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.meta { display: flex; align-items: center; gap: 5px; font-size: .65rem; color: var(--t3); }
+.dot { width: 3px; height: 3px; border-radius: 50%; background: var(--t3); }
+.cast { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 1px; }
+.castChip { font-size: .62rem; font-weight: 600; padding: 2px 5px; background: var(--bg-hover); border-radius: 8px; color: var(--t2); }
+
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 9px; border-top: 1px solid var(--border);
+  background: rgba(0,0,0,.18);
+}
+.risk { font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
+.rLo { background: var(--grn-d); color: var(--grn); }
+.rMd { background: var(--gold-d); color: var(--gold); }
+.rHi { background: var(--red-d); color: var(--red); }
+.pages { font-size: .65rem; font-weight: 700; color: var(--t3); }

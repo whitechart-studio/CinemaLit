@@ -1,0 +1,34 @@
+/* src/components/layout/StatusBar.module.css */
+.sbar {
+  height: var(--bar);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 14px;
+  font-size: .68rem;
+  color: var(--t3);
+  flex-shrink: 0;
+}
+
+.si {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.si strong {
+  color: var(--t2);
+  font-weight: 600;
+}
+
+.ss {
+  color: var(--border-hi);
+}
+
+.sr {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

@@ -1,0 +1,147 @@
+/* src/components/layout/TopBar.module.css */
+.topbar {
+  height: var(--top);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.brand { display: flex; align-items: center; gap: 9px; }
+.brandMark {
+  width: 29px; height: 29px;
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: #000;
+  box-shadow: 0 0 14px rgba(245,158,11,.35);
+}
+.brandName { font-size: .95rem; font-weight: 900; letter-spacing: -.03em; color: var(--t1); }
+.brandName span { color: var(--gold); }
+
+.center { display: flex; align-items: center; gap: 10px; }
+.projPill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 11px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.projPill:hover { border-color: var(--border-hi); background: var(--bg-hover); }
+.projName { font-size: .84rem; font-weight: 700; }
+.projPhase {
+  font-size: .64rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--gold); background: var(--gold-d);
+  padding: 2px 6px; border-radius: 3px;
+}
+.chips { display: flex; gap: 5px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: .7rem; font-weight: 700; letter-spacing: .02em;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.chipG { background: var(--grn-d); color: var(--grn); }
+.chipG .dot { background: var(--grn); }
+.chipC { background: var(--cyan-d); color: var(--cyan); }
+.chipC .dot { background: var(--cyan); }
+.chipA { background: var(--gold-d); color: var(--gold); }
+.chipA .dot { background: var(--gold); }
+
+.right { display: flex; align-items: center; gap: 7px; }
+.iconBtn {
+  width: 30px; height: 30px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t2); transition: all .15s;
+}
+.iconBtn:hover { background: var(--bg-hover); color: var(--t1); }
+.primaryBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 13px; background: var(--gold);
+  color: #000; border-radius: 7px;
+  font-size: .78rem; font-weight: 800;
+  transition: all .15s;
+}
+.primaryBtn:hover { background: #FBBF24; box-shadow: 0 0 14px rgba(245,158,11,.4); }
+.avatar {
+  width: 29px; height: 29px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--gold);
+  color: var(--gold); font-size: .72rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+.userAvatar {
+  width: 29px; height: 29px; border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  object-fit: cover;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.loginPillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: var(--gold);
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all .14s;
+}
+.loginPillBtn:hover {
+  background: rgba(251, 191, 36, 0.22);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.signOutBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #F87171;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all .14s;
+}
+.signOutBtn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #EF4444;
+  color: #FFF;
+  transform: translateY(-1px);
+}
+
+.fullPageAuthBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--t2);
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .14s;
+}
+.fullPageAuthBtn:hover {
+  border-color: var(--border-hi);
+  color: #FFF;
+}

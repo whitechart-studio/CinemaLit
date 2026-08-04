@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cinemalit"
+version = "0.1.0"
+description = "CinemaLit Studio: Director-led agentic production system"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "google-genai>=0.1.0",
+    "requests>=2.28.0",
+    "PyJWT>=2.8.0",
+]
+
+[project.scripts]
+cinemalit = "cinemalit.cli:main"
+cinemalit-story = "cinemalit.cli_crews.story_cli:main"
+cinemalit-production = "cinemalit.cli_crews.production_cli:main"
+cinemalit-budget = "cinemalit.cli_crews.budget_cli:main"
+cinemalit-schedule = "cinemalit.cli_crews.schedule_cli:main"
+cinemalit-ops = "cinemalit.cli_crews.ops_cli:main"
+cinemalit-governance = "cinemalit.cli_crews.governance_cli:main"

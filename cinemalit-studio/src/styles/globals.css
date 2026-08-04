@@ -1,0 +1,54 @@
+/* src/styles/globals.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:        #09090E;
+  --bg-panel:  #111118;
+  --bg-elev:   #191924;
+  --bg-hover:  #21212E;
+  --bg-active: #292939;
+  --border:    rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.13);
+  --t1: #F0F0F5;
+  --t2: #8A8A9E;
+  --t3: #52526A;
+  --gold:   #F59E0B;
+  --gold-d: rgba(245,158,11,0.14);
+  --cyan:   #06B6D4;
+  --cyan-d: rgba(6,182,212,0.14);
+  --red:    #EF4444;
+  --red-d:  rgba(239,68,68,0.14);
+  --grn:    #22C55E;
+  --grn-d:  rgba(34,197,94,0.14);
+  --pur:    #A855F7;
+  --pur-d:  rgba(168,85,247,0.14);
+  /* Industry strip colours */
+  --sin: #1A1A2E; --sin-a: #4ADE80;
+  --sen: #0E1829; --sen-a: #60A5FA;
+  --sed: #2E2A10; --sed-a: #F59E0B;
+  --sid: #1C1C0E; --sid-a: #E5D87A;
+  --font: 'Inter', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --rail: 240px;
+  --top:  48px;
+  --ins:  360px;
+  --bar:  28px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--t1);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: var(--font); cursor: pointer; border: none; background: none; }
+textarea, input { font-family: var(--font); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: var(--bg-active); border-radius: 2px; }

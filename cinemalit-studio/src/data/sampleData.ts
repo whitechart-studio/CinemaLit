@@ -1,0 +1,107 @@
+// src/data/sampleData.ts
+import type { Scene, Connection, Shot, BudgetItem, CastCallEntry } from '../types';
+
+export const initialScenes: Scene[] = [
+  {
+    id: 'sn0',
+    num: '01',
+    slug: 'INT. NEON COFFEE SHOP — NIGHT',
+    type: 'INT',
+    timing: 'NIGHT',
+    loc: 'Neon Coffee Shop',
+    pages: '0.31',
+    cast: ['Maya', 'Kai'],
+    shots: 4,
+    risk: 'high',
+    riskNote: 'Prop Weapon on set — licensed armorer required',
+    day: 1,
+    desc: 'Maya and Kai meet covertly. The prop gun is placed on the table.',
+    props: ['Prop Gun (licensed)', 'Glowing Terminal', 'Chrome Case'],
+    ward: ['Maya Hacker Rig', 'Kai Tactical'],
+    vfx: ['Cyan Neon Tubes', 'Rain Window Projection'],
+    sfx: ['City Hum BG', 'Rain Practical'],
+    x: 100,
+    y: 160,
+  },
+  {
+    id: 'sn1',
+    num: '02',
+    slug: 'EXT. DINER ALLEYWAY — NIGHT',
+    type: 'EXT',
+    timing: 'NIGHT',
+    loc: 'Diner Alleyway',
+    pages: '0.25',
+    cast: ['Maya', 'Kai', 'Agents ×4'],
+    shots: 3,
+    risk: 'high',
+    riskNote: 'Rain machine + stunt coordinator required',
+    day: 1,
+    desc: 'Rain-soaked chase through the alley. Stunt work required.',
+    props: ['Blacked-Out Sedan', 'Tactical Gear ×4'],
+    ward: ['Wet Weather — All Cast'],
+    vfx: ['BG Rain Enhancement'],
+    sfx: ['Rain Machine', 'Tire Screech'],
+    x: 400,
+    y: 160,
+  },
+  {
+    id: 'sn2',
+    num: '03',
+    slug: 'INT. PICTURE VEHICLE — NIGHT',
+    type: 'INT',
+    timing: 'NIGHT',
+    loc: 'Picture Vehicle',
+    pages: '0.19',
+    cast: ['Maya', 'Kai'],
+    shots: 3,
+    risk: 'low',
+    riskNote: 'Low risk — studio lot car rig',
+    day: 2,
+    desc: 'Kai drives while Maya hacks the system. BG plate: city chase.',
+    props: ['Sedan Interior Rig', 'Hacking Terminal'],
+    ward: ['Continuation from Sc.1'],
+    vfx: ['Dashboard Screen VFX', 'BG City Plate'],
+    sfx: ['Engine SFX', 'Keyboard Clicks'],
+    x: 700,
+    y: 160,
+  },
+];
+
+export const initialConnections: Connection[] = [
+  { id: 'c0', from: 'sn0', to: 'sn1' },
+  { id: 'c1', from: 'sn1', to: 'sn2' },
+];
+
+export const shots: Shot[] = [
+  { id: 'sh1a', sceneNum: '01', label: '1A', type: 'WS', angle: 'Eye-Level', movement: 'Static', lens: '28mm', desc: 'Wide master of diner. Establish neon atmosphere.', status: 'approved' },
+  { id: 'sh1b', sceneNum: '01', label: '1B', type: 'MS', angle: 'Eye-Level', movement: 'Dolly Push', lens: '50mm', desc: 'Maya at terminal — rack focus to Kai entering.', status: 'approved' },
+  { id: 'sh1c', sceneNum: '01', label: '1C', type: 'CU', angle: 'Slight Low', movement: 'Static', lens: '85mm', desc: 'Prop gun placed on table face-down.', status: 'planned' },
+  { id: 'sh1d', sceneNum: '01', label: '1D', type: 'ECU', angle: 'Eye-Level', movement: 'Static', lens: '85mm', desc: "Insert: Maya's eyes — scanning, assessing.", status: 'planned' },
+  { id: 'sh2a', sceneNum: '02', label: '2A', type: 'WS', angle: 'High Angle', movement: 'Crane Down', lens: '24mm', desc: 'Alley mouth. Sedan idles. Rain machine at 80%.', status: 'planned' },
+  { id: 'sh2b', sceneNum: '02', label: '2B', type: 'MS', angle: 'Low Angle', movement: 'Handheld Track', lens: '35mm', desc: 'Running — Maya & Kai burst from exit.', status: 'planned' },
+  { id: 'sh2c', sceneNum: '02', label: '2C', type: 'POV', angle: 'Eye-Level', movement: 'Handheld', lens: '24mm', desc: 'POV Agents — targets fleeing through rain.', status: 'planned' },
+  { id: 'sh3a', sceneNum: '03', label: '3A', type: 'MS', angle: 'Dashboard POV', movement: 'Rig Mount', lens: '35mm', desc: 'Kai drives — rearview of pursuit vehicles.', status: 'planned' },
+  { id: 'sh3b', sceneNum: '03', label: '3B', type: 'CU', angle: 'Low', movement: 'Static', lens: '85mm', desc: 'Maya jacks terminal into dash port.', status: 'planned' },
+  { id: 'sh3c', sceneNum: '03', label: '3C', type: 'ECU', angle: 'Macro', movement: 'Static', lens: '100mm', desc: 'Dashboard screens flicker — data stream.', status: 'planned' },
+];
+
+export const budgetItems: BudgetItem[] = [
+  { id: 'b-atl', acct: '1000', category: 'ABOVE-THE-LINE', desc: '', estimated: 0, cap: 0, isCategory: true },
+  { id: 'b-writer', acct: '1100', category: 'Writer Fee', desc: 'Short-form WGA scale', estimated: 500, cap: 500, status: 'ok' },
+  { id: 'b-cast', acct: '2000', category: 'CAST & TALENT', desc: '', estimated: 0, cap: 0, isCategory: true },
+  { id: 'b-leads', acct: '2100', category: 'Lead Actors ×2', desc: 'SAG Ultra Low Budget Day Rate', estimated: 2000, cap: 1250, status: 'over' },
+  { id: 'b-day', acct: '2200', category: 'Day Players ×4', desc: 'Tactical Agents — 1 day', estimated: 800, cap: 800, status: 'ok' },
+  { id: 'b-loc', acct: '3000', category: 'LOCATIONS & PERMITS', desc: '', estimated: 0, cap: 0, isCategory: true },
+  { id: 'b-alley', acct: '3100', category: 'Diner Alleyway', desc: 'Dock District permit + location fee', estimated: 3000, cap: 1250, status: 'over' },
+  { id: 'b-prod', acct: '4000', category: 'PRODUCTION & SFX', desc: '', estimated: 0, cap: 0, isCategory: true },
+  { id: 'b-rain', acct: '4100', category: 'Rain Machine', desc: '1-day rental + operator', estimated: 410, cap: 400, status: 'pending' },
+  { id: 'b-prop', acct: '4200', category: 'Prop Weapon', desc: 'Licensed gun + armorer 2-day', estimated: 400, cap: 400, status: 'ok' },
+  { id: 'b-cont', acct: '8000', category: 'CONTINGENCY', desc: '', estimated: 0, cap: 0, isCategory: true },
+  { id: 'b-10pct', acct: '8100', category: '10% Contingency', desc: 'Auto-calculated', estimated: 700, cap: 400 },
+];
+
+export const castCallEntries: CastCallEntry[] = [
+  { character: 'Maya', actor: 'A. Portman', makeup: '06:30', wardrobe: '07:00', setCall: '08:00', scenes: '1, 2' },
+  { character: 'Kai', actor: 'C. Bale', makeup: '07:00', wardrobe: '07:30', setCall: '08:30', scenes: '1, 2' },
+  { character: 'Agents ×4', actor: 'Day Players', makeup: '09:00', wardrobe: '09:30', setCall: '10:00', scenes: '2' },
+];

@@ -1,0 +1,106 @@
+/* src/components/layout/WorkspaceHeader.module.css */
+.header {
+  height: 38px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.tabsWrapper {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  height: 100%;
+}
+.tabsWrapper::-webkit-scrollbar { height: 0; }
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 10px;
+  font-size: .76rem;
+  font-weight: 500;
+  color: var(--t3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all .14s;
+  user-select: none;
+  border-radius: 4px 4px 0 0;
+}
+.tab:hover {
+  color: var(--t2);
+  background: var(--bg-hover);
+}
+.tab.active {
+  color: var(--t1);
+  background: var(--bg-elev);
+  border-bottom-color: var(--gold);
+  font-weight: 600;
+}
+
+.tabIcon { display: flex; align-items: center; }
+.tabLabel { display: flex; align-items: center; }
+
+.closeBtn {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  opacity: .5;
+  transition: all .14s;
+  margin-left: 2px;
+}
+.tab:hover .closeBtn { opacity: 1; }
+.closeBtn:hover {
+  background: var(--red-d);
+  color: var(--red);
+  opacity: 1;
+}
+
+.addTabBtn {
+  width: 28px;
+  height: 28px;
+  align-self: center;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  transition: all .14s;
+  margin-left: 2px;
+}
+.addTabBtn:hover {
+  background: var(--bg-hover);
+  color: var(--t1);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 3px;
+}
+
+.btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t2);
+  transition: all .14s;
+}
+.btn:hover { background: var(--bg-hover); color: var(--t1); }
+.activeBtn { color: var(--gold); background: var(--bg-active); }

@@ -1,0 +1,63 @@
+/* src/components/canvas/SceneCanvas.module.css */
+.wrapper {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.container {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: #0b0c10;
+}
+
+.dotGrid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.12) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+}
+
+.board {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4000px;
+  height: 3000px;
+  transform-origin: 0 0;
+}
+
+.hints {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: .63rem;
+  color: var(--t3);
+  opacity: .7;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(17, 17, 24, 0.85);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.kbd {
+  display: inline-block;
+  padding: 1px 4px;
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  font-family: var(--mono);
+  color: var(--gold);
+  background: var(--bg-elev);
+}

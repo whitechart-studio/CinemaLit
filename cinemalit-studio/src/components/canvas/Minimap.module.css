@@ -1,0 +1,14 @@
+/* src/components/canvas/Minimap.module.css */
+.wrapper {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(17, 17, 24, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-hi);
+  border-radius: 7px;
+  overflow: hidden;
+  z-index: 50;
+  cursor: default;
+  display: flex;
+}

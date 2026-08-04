@@ -1,0 +1,317 @@
+/* src/components/wizard/NewProjectWizard.module.css */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal {
+  width: 100%;
+  max-width: 680px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-hi);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: .64rem;
+  font-weight: 800;
+  background: var(--gold-d);
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 6px;
+}
+
+.header h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--t1);
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  transition: all .14s;
+}
+.closeBtn:hover { background: var(--bg-hover); color: var(--t1); }
+
+/* PROGRESS BAR */
+.progressBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+
+.stepIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--t3);
+}
+.stepNum {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .68rem;
+  font-weight: 800;
+}
+.stepDone {
+  color: var(--t1);
+}
+.stepDone .stepNum {
+  background: var(--gold);
+  color: #000;
+}
+
+.line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  margin: 0 8px;
+}
+
+/* CONTENT */
+.content {
+  padding: 24px;
+  min-height: 280px;
+}
+
+.stepBox {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stepIntro h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.stepIntro p {
+  font-size: .78rem;
+  color: var(--t3);
+  margin-top: 2px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.input, .select, .textarea {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--t1);
+  font-size: .84rem;
+  outline: none;
+  transition: all .15s;
+}
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.sourceToggle {
+  display: flex;
+  gap: 8px;
+}
+
+.toggleBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: .78rem;
+  font-weight: 700;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--t2);
+  transition: all .15s;
+}
+.toggleBtn:hover { background: var(--bg-hover); color: var(--t1); }
+.activeToggle {
+  background: var(--gold-d);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.uploadZone {
+  border: 2px dashed var(--border-hi);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  background: var(--bg-elev);
+}
+.uploadZone h4 { font-size: .9rem; font-weight: 800; }
+.uploadZone p { font-size: .74rem; color: var(--t3); }
+
+.filePill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-hi);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: .74rem;
+  font-family: var(--mono);
+  margin-top: 4px;
+}
+
+/* AGENT GRID */
+.agentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.agentCard {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all .15s;
+}
+.agentCard:hover {
+  border-color: var(--border-hi);
+  background: var(--bg-hover);
+}
+.agentSelected {
+  border-color: var(--gold) !important;
+  background: var(--gold-d) !important;
+}
+
+.agentHdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .82rem;
+}
+.agentHdr strong { flex: 1; }
+
+.checkIcon { margin-left: auto; }
+
+.agentDesc {
+  font-size: .72rem;
+  color: var(--t2);
+  line-height: 1.35;
+}
+
+.memoryBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--cyan-d);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: .76rem;
+}
+.memoryBox strong { color: var(--cyan); display: block; }
+.memoryBox p { color: var(--t2); font-size: .72rem; margin-top: 2px; }
+
+/* FOOTER */
+.footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-elev);
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--t2);
+  transition: all .15s;
+}
+.backBtn:hover { background: var(--bg-hover); color: var(--t1); }
+
+.nextBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: var(--gold);
+  color: #000;
+  border-radius: 7px;
+  font-size: .82rem;
+  font-weight: 800;
+  transition: all .15s;
+}
+.nextBtn:hover {
+  background: #FBBF24;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+}
