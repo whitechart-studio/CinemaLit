@@ -204,9 +204,9 @@
 .grid {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 20px;
   align-content: start;
 }
@@ -214,22 +214,26 @@
 .frameCard {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: all .14s;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  transition: all .18s ease;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
 }
 .frameCard:hover {
   border-color: var(--gold);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
 }
 
 .imgWrapper {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  position: relative;
+  height: 100%;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: #000;
   cursor: pointer;
   overflow: hidden;
@@ -239,7 +243,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform .3s;
+  transition: transform .35s ease;
 }
 .imgWrapper:hover .frameImg {
   transform: scale(1.04);
@@ -297,33 +301,73 @@
 }
 
 .cardBody {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
   padding: 12px;
+  background: linear-gradient(to top, rgba(9, 9, 18, 0.95) 0%, rgba(9, 9, 18, 0.75) 70%, transparent 100%);
   display: flex;
   flex-direction: column;
   gap: 4px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.frameTitleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .frameTitle {
   font-size: .8rem;
   font-weight: 800;
-  color: var(--t1);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 }
 
 .specTag {
-  font-size: .68rem;
+  font-size: .66rem;
   color: var(--cyan);
   font-family: var(--mono);
   font-weight: 700;
 }
 
 .promptBox {
-  font-size: .68rem;
-  color: var(--t3);
-  background: rgba(0,0,0,0.3);
-  padding: 6px 8px;
+  font-size: .65rem;
+  color: var(--t2);
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  padding: 5px 8px;
   border-radius: 4px;
-  margin-top: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-top: 2px;
   font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardScriptBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: var(--gold);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: .65rem;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  align-self: flex-start;
+  margin-top: 4px;
+  transition: all .14s;
+}
+.cardScriptBtn:hover {
+  background: var(--gold);
+  color: #000;
 }
 
 /* Modal */
