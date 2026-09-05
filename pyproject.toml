@@ -23,3 +23,8 @@ cinemalit-budget = "cinemalit.cli_crews.budget_cli:main"
 cinemalit-schedule = "cinemalit.cli_crews.schedule_cli:main"
 cinemalit-ops = "cinemalit.cli_crews.ops_cli:main"
 cinemalit-governance = "cinemalit.cli_crews.governance_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cinemalit*", "web*"]
+
