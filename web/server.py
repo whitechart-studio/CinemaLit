@@ -32,6 +32,8 @@ from web.auth import (
 )
 from web.db import CH_DB, CH_HOST, CH_PORT, ch_escape, ch_ping, ch_query
 
+from cinemalit.mcp.orchestrator import MCPOrchestrator
+
 PORT = int(os.getenv("CINEMALIT_WEB_PORT", "8000"))
 WEB_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "dist")
@@ -43,7 +45,21 @@ PUBLIC_API_PATHS = {
     "/api/auth/google",
     "/api/status",
     "/api/clickhouse/ping",
+    "/api/mcp/tools",
 }
+
+mcp_orchestrator = MCPOrchestrator()
+try:
+    python_bin = sys.executable
+    mcp_orchestrator.register_client(
+        name="cinemalit-core",
+        command=[python_bin, "cinemalit/mcp/server.py"],
+        env=dict(os.environ, PYTHONPATH=os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    )
+    mcp_orchestrator.start_all()
+    print(f"✅ MCP Orchestrator initialized with {len(mcp_orchestrator.get_all_tools())} tools across registered MCP servers.")
+except Exception as e:
+    print(f"⚠️ Failed to initialize MCP Orchestrator: {e}")
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -142,7 +158,22 @@ def add_scene_element(scene_number: str, element_type: str, name: str, cost_usd:
     except Exception as e:
         return {"error": str(e)}
 
-AGENT_TOOLS = [query_production_db, get_scene_details, add_scene_element]
+def get_combined_agent_tools():
+    tools = [query_production_db, get_scene_details, add_scene_element]
+    if mcp_orchestrator:
+        for decl in mcp_orchestrator.get_gemini_tool_declarations():
+            t_name = decl["name"]
+            t_desc = decl["description"]
+            
+            def make_wrapper(name, desc):
+                def mcp_tool_wrapper(**kwargs):
+                    return mcp_orchestrator.execute_tool(name, kwargs)
+                mcp_tool_wrapper.__name__ = name
+                mcp_tool_wrapper.__doc__ = desc
+                return mcp_tool_wrapper
+                
+            tools.append(make_wrapper(t_name, t_desc))
+    return tools
 
 
 class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -259,6 +290,8 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_ch_budget()
         elif path == "/api/clickhouse/stats":
             self._handle_ch_stats()
+        elif path == "/api/mcp/tools":
+            self._handle_mcp_tools()
         else:
             super().do_GET()
 
@@ -466,9 +499,8 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 system_prompt = (
                     "You are the CinemaLit Director AI Agent — an autonomous Hollywood production agent. "
-                    "You have direct access to the ClickHouse production database via tools. "
-                    "When a user asks about budgets, elements, or schedules, USE YOUR TOOLS to find the answers! "
-                    "If asked to break down a scene, use get_scene_details and add_scene_element. "
+                    "You have direct access to the ClickHouse production database and CinemaLit MCP tools. "
+                    "When a user asks about screenplay breakdown, budgets, storyboards, elements, or schedules, USE YOUR MCP TOOLS! "
                     "Answer concisely with professional film industry insight."
                 )
                 
@@ -476,20 +508,24 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                     model=GEMINI_MODEL,
                     config=types.GenerateContentConfig(
                         system_instruction=system_prompt,
-                        tools=AGENT_TOOLS,
+                        tools=get_combined_agent_tools(),
                         temperature=0.1
                     )
                 )
                 
                 response = chat.send_message(user_msg)
-                reply_text = response.text.strip()
-                source = f"{GEMINI_MODEL} (Agentic)"
+                reply_text = response.text.strip() if response.text else "Executed requested agent action."
+                source = f"{GEMINI_MODEL} (MCP Agentic)"
             else:
                 reply_text = f"AI Agent (offline): '{user_msg}' — configure GOOGLE_API_KEY to enable Gemini."
                 source = "offline"
             json_resp(self, {"status": "ok", "reply": reply_text, "source": source})
         except Exception as exc:
             json_resp(self, {"status": "error", "error": str(exc)}, 500)
+
+    def _handle_mcp_tools(self):
+        tools = mcp_orchestrator.get_all_tools() if mcp_orchestrator else []
+        json_resp(self, {"status": "ok", "count": len(tools), "tools": tools})
 
     def _handle_analyze_script(self):
         data = self._read_json()

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cinemalit": {
+      "command": "python3",
+      "args": ["-m", "cinemalit.mcp.server"],
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+}
