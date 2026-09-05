@@ -93,6 +93,57 @@ def json_resp(handler, data: dict, status: int = 200):
     handler.end_headers()
     handler.wfile.write(payload)
 
+# --- AGENT TOOLS ---
+def query_production_db(sql_query: str) -> dict:
+    """Executes a READ-ONLY SELECT query against the ClickHouse production database to retrieve raw data."""
+    if not sql_query.strip().upper().startswith("SELECT"):
+        return {"error": "Only SELECT queries are allowed via this tool."}
+    try:
+        res = ch_query(sql_query)
+        return {"data": res.get("data", [])[:20]} # limit to 20 rows
+    except Exception as e:
+        return {"error": str(e)}
+
+def get_scene_details(scene_number: str) -> dict:
+    """Retrieves all details for a specific scene, including cast members, elements, and shots."""
+    try:
+        scene = ch_query(f"SELECT scene_id, int_ext, location, time_of_day, description, status FROM {CH_DB}.scenes WHERE scene_number = {{sn:String}}", {"sn": scene_number}).get("data", [])
+        if not scene:
+            return {"error": f"Scene {scene_number} not found."}
+        s_id = scene[0][0]
+        elements = ch_query(f"SELECT element_type, name, cost_usd, vendor, status FROM {CH_DB}.elements WHERE scene_id = {{s_id:UInt32}}", {"s_id": s_id}).get("data", [])
+        cast = ch_query(f"SELECT c.character_name, c.actor_name, c.day_rate_usd FROM {CH_DB}.scene_cast sc JOIN {CH_DB}.cast_members c ON sc.cast_id = c.cast_id WHERE sc.scene_id = {{s_id:UInt32}}", {"s_id": s_id}).get("data", [])
+        shots = ch_query(f"SELECT shot_code, framing, description FROM {CH_DB}.shots WHERE scene_id = {{s_id:UInt32}}", {"s_id": s_id}).get("data", [])
+        return {
+            "scene_number": scene_number,
+            "scene_info": scene[0],
+            "cast": cast,
+            "elements": elements,
+            "shots": shots
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+def add_scene_element(scene_number: str, element_type: str, name: str, cost_usd: float, vendor: str) -> dict:
+    """Proactively adds a new breakdown element (e.g. vfx, sfx, prop, stunt, cast) to a scene in the database."""
+    try:
+        scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes WHERE scene_number = {{sn:String}}", {"sn": scene_number}).get("data", [])
+        if not scene:
+            return {"error": f"Scene {scene_number} not found."}
+        s_id = scene[0][0]
+        max_id = ch_query(f"SELECT MAX(element_id) FROM {CH_DB}.elements").get("data", [[0]])[0][0]
+        new_id = int(max_id) + 1 if max_id else 1
+        
+        ch_query(f"""
+            INSERT INTO {CH_DB}.elements (element_id, scene_id, element_type, name, cost_usd, vendor, status)
+            VALUES ({{e_id:UInt32}}, {{s_id:UInt32}}, {{type:String}}, {{name:String}}, {{cost:Float64}}, {{vendor:String}}, 'planned')
+        """, {"e_id": new_id, "s_id": s_id, "type": element_type, "name": name, "cost": cost_usd, "vendor": vendor})
+        return {"status": "success", "message": f"Added {name} ({element_type}) to {scene_number} for ${cost_usd}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+AGENT_TOOLS = [query_production_db, get_scene_details, add_scene_element]
+
 
 class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -169,6 +220,25 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = self._path()
+        
+        # Intercept dynamic storyboard images and serve them directly from disk
+        if path.startswith("/storyboards/"):
+            # Maps /storyboards/scene_01/frame.jpg -> ../storyboards/scene_01/frame.jpg
+            local_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", path.lstrip("/")))
+            if os.path.exists(local_path) and os.path.isfile(local_path):
+                self.send_response(200)
+                if local_path.lower().endswith(".jpg") or local_path.lower().endswith(".jpeg"):
+                    self.send_header("Content-Type", "image/jpeg")
+                elif local_path.lower().endswith(".png"):
+                    self.send_header("Content-Type", "image/png")
+                self.end_headers()
+                with open(local_path, "rb") as f:
+                    self.wfile.write(f.read())
+                return
+            else:
+                self.send_error(404, "Storyboard image not found")
+                return
+
         if path.startswith("/api/") and path not in PUBLIC_API_PATHS:
             if self._require_auth() is None:
                 return
@@ -392,15 +462,28 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         user_msg = data.get("message", "")
         try:
             if genai_client:
-                prompt = (
-                    "You are the CinemaLit Director AI Agent — an expert Hollywood director, "
-                    "1st AD, line producer, and budget controller. "
-                    "Answer concisely with professional film industry insight.\n\n"
-                    f"User: {user_msg}"
+                from google.genai import types
+                
+                system_prompt = (
+                    "You are the CinemaLit Director AI Agent — an autonomous Hollywood production agent. "
+                    "You have direct access to the ClickHouse production database via tools. "
+                    "When a user asks about budgets, elements, or schedules, USE YOUR TOOLS to find the answers! "
+                    "If asked to break down a scene, use get_scene_details and add_scene_element. "
+                    "Answer concisely with professional film industry insight."
                 )
-                response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+                
+                chat = genai_client.chats.create(
+                    model=GEMINI_MODEL,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        tools=AGENT_TOOLS,
+                        temperature=0.1
+                    )
+                )
+                
+                response = chat.send_message(user_msg)
                 reply_text = response.text.strip()
-                source = GEMINI_MODEL
+                source = f"{GEMINI_MODEL} (Agentic)"
             else:
                 reply_text = f"AI Agent (offline): '{user_msg}' — configure GOOGLE_API_KEY to enable Gemini."
                 source = "offline"
@@ -619,6 +702,10 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             processed_frames = []
             for idx, fr in enumerate(raw_frames, start=1):
+                import time
+                if idx > 1:
+                    time.sleep(2.0) # Avoid rate limits from image APIs
+                    
                 dest_file_name = f"frame_{str(idx).zfill(2)}.jpg"
                 dest_local_path = os.path.join(scene_dir, dest_file_name)
                 dest_public_path = os.path.join(public_scene_dir, dest_file_name)
@@ -629,21 +716,22 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 try:
                     # 1. Try Pollinations dynamic text-to-image API
-                    clean_prompt = re.sub(r"[^\w\s]", "", prompt_text)[:120]
+                    base_prompt = re.sub(r"[^\w\s]", "", prompt_text)[:120]
+                    clean_prompt = f"Cinematic film still, photorealistic, 8k resolution, highly detailed, movie scene: {base_prompt}"
                     poll_url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&seed={idx+int(scene_num)}"
                     req = urllib.request.Request(poll_url, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib.request.urlopen(req, timeout=8) as resp:
+                    with urllib.request.urlopen(req, timeout=25) as resp:
                         img_data = resp.read()
                 except Exception as p_err:
-                    print(f"⚠️ Pollinations API ({p_err}) — trying dynamic picsum fallback...")
+                    print(f"⚠️ Pollinations API ({p_err}) — trying dummyimage fallback...")
                     try:
-                        # 2. Try Picsum dynamic random image API
-                        pic_url = f"https://picsum.photos/512/512?random={scene_num}{idx}"
-                        req = urllib.request.Request(pic_url, headers={"User-Agent": "Mozilla/5.0"})
-                        with urllib.request.urlopen(req, timeout=6) as resp:
-                            img_data = resp.read()
+                        short_p = urllib.parse.quote(base_prompt[:120])
+                        pic_url = f"https://placehold.co/512x512/222222/cccccc.png?text={short_p}"
+                        req2 = urllib.request.Request(pic_url, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req2, timeout=5) as r2:
+                            img_data = r2.read()
                     except Exception as pic_err:
-                        print(f"⚠️ Picsum API ({pic_err}) — copying local asset fallback.")
+                        print(f"⚠️ Dummyimage API ({pic_err}) — copying local asset fallback.")
 
                 # Fallback to local image copy if network API is unreachable
                 if not img_data:
@@ -681,6 +769,33 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "frames": processed_frames,
                 },
             )
+
+            # Persist the newly generated frames in ClickHouse
+            try:
+                # First delete any existing frames for this scene/project
+                ch_query(f"ALTER TABLE {CH_DB}.storyboards DELETE WHERE project_id = {{proj:String}} AND scene_num = {{sn:String}}", params={"proj": proj_id, "sn": scene_num})
+                # Insert the new frames
+                for fr in processed_frames:
+                    ch_query(
+                        f"INSERT INTO {CH_DB}.storyboards "
+                        f"(project_id, scene_num, frame_num, title, camera_spec, start_sec, end_sec, prompt, img_url) "
+                        f"VALUES ({{p:String}}, {{sn:String}}, {{fn:UInt8}}, {{t:String}}, {{cs:String}}, {{ss:Int32}}, {{es:Int32}}, {{pr:String}}, {{iu:String}})",
+                        params={
+                            "p": proj_id,
+                            "sn": scene_num,
+                            "fn": fr.get("frameNum", 1),
+                            "t": fr.get("title", ""),
+                            "cs": fr.get("cameraSpec", ""),
+                            "ss": fr.get("startSec", 0),
+                            "es": fr.get("endSec", 0),
+                            "pr": fr.get("prompt", ""),
+                            "iu": fr.get("imgUrl", ""),
+                        }
+                    )
+            except Exception as e:
+                print(f"Failed to persist storyboards to DB: {e}")
+
+
         except Exception as exc:
             json_resp(self, {"status": "error", "error": str(exc)}, 500)
 
@@ -791,9 +906,48 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "09": "/sc6_docks.jpg",
                 }
 
+            # Fetch saved storyboards
+            sb_result = ch_query(
+                f"SELECT scene_num, frame_num, title, camera_spec, start_sec, end_sec, prompt, img_url "
+                f"FROM {CH_DB}.storyboards WHERE project_id = {{proj:String}} ORDER BY scene_num, frame_num",
+                params={"proj": proj_id}
+            )
+            saved_sbs = {}
+            for row in sb_result.get("data", []):
+                sn = row[0]
+                saved_sbs.setdefault(sn, []).append({
+                    "id": f"f-{sn}-{row[1]}",
+                    "frameNum": int(row[1]),
+                    "title": row[2],
+                    "cameraSpec": row[3],
+                    "startSec": int(row[4]),
+                    "endSec": int(row[5]),
+                    "prompt": row[6],
+                    "imgUrl": row[7],
+                    "timing": f"00:{int(row[4]):02d} - 00:{int(row[5]):02d}",
+                })
+
             for r in result.get("data", []):
                 num = str(r[0]).replace("SC-", "").replace("SCENE ", "")
                 int_ext, loc, tod, pg = r[1], r[2], r[3], float(r[4])
+                
+                if num in saved_sbs and len(saved_sbs[num]) > 0:
+                    frames = saved_sbs[num]
+                else:
+                    frames = [
+                        {
+                            "id": f"f-{num}-1",
+                            "frameNum": 1,
+                            "title": f"Frame 01 — Establishing {loc}",
+                            "imgUrl": img_map.get(num, "/sc1_f1.jpg"),
+                            "prompt": f"{int_ext} {loc} {tod} cinematic establishing shot",
+                            "cameraSpec": "35mm Prime · Static Wide",
+                            "startSec": 0,
+                            "endSec": 5,
+                            "timing": "00:00 - 00:05 (5s interval)",
+                        }
+                    ]
+                    
                 scenes.append(
                     {
                         "sceneNum": num,
@@ -801,19 +955,7 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                         "desc": r[7] if len(r) > 7 and r[7] else f"Scene {num} in {loc}",
                         "totalDurationSec": int(pg * 60) if pg > 0 else 18,
                         "recommendedIntervalSec": 5 if pg <= 0.5 else 8,
-                        "frames": [
-                            {
-                                "id": f"f-{num}-1",
-                                "frameNum": 1,
-                                "title": f"Frame 01 — Establishing {loc}",
-                                "imgUrl": img_map.get(num, "/sc1_f1.jpg"),
-                                "prompt": f"{int_ext} {loc} {tod} cinematic establishing shot",
-                                "cameraSpec": "35mm Prime · Static Wide",
-                                "startSec": 0,
-                                "endSec": 5,
-                                "timing": "00:00 - 00:05 (5s interval)",
-                            }
-                        ],
+                        "frames": frames,
                     }
                 )
             json_resp(self, {"status": "ok", "scenes": scenes})

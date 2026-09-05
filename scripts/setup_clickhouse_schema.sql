@@ -90,6 +90,21 @@ CREATE TABLE IF NOT EXISTS shots (
 PRIMARY KEY shot_id
 ORDER BY shot_id;
 
+-- 8. Storyboards Table
+CREATE TABLE IF NOT EXISTS storyboards (
+    project_id String,
+    scene_num String,
+    frame_num UInt8,
+    title String,
+    camera_spec String,
+    start_sec Int32,
+    end_sec Int32,
+    prompt String,
+    img_url String,
+    created_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY (project_id, scene_num, frame_num);
+
 -- ─── SEED DATA ─────────────────────────────────────────────────────────────
 
 INSERT INTO scenes VALUES
