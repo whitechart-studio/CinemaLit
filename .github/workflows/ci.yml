@@ -46,7 +46,7 @@ jobs:
           clean_content = '\n'.join(lines)
           for stmt in clean_content.split(';'):
               if stmt.strip():
-                  req = urllib.request.Request('http://localhost:8123/?database=cinemalit', data=stmt.strip().encode('utf-8'), headers={'Authorization': f'Basic {creds}'})
+                  req = urllib.request.Request('http://localhost:8123/', data=stmt.strip().encode('utf-8'), headers={'Authorization': f'Basic {creds}'})
                   urllib.request.urlopen(req)
           "
 
