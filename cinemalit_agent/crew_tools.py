@@ -41,32 +41,38 @@ DEFAULT_PROJECT_ID = "p1"
 
 def _ensure_tables() -> None:
     """Create the two new tables these tools need, if they don't exist yet.
-    Same on-demand pattern web/server.py already uses for its users table."""
-    ch_query(
-        """
-        CREATE TABLE IF NOT EXISTS cinemalit.governance_gates (
-            project_id String,
-            gate_id    String,
-            gate_name  String,
-            status     LowCardinality(String),
-            rationale  String,
-            updated_at DateTime DEFAULT now()
-        ) ENGINE = MergeTree()
-        ORDER BY (project_id, gate_id)
-        """
-    )
-    ch_query(
-        """
-        CREATE TABLE IF NOT EXISTS cinemalit.agent_audit_log (
-            project_id String,
-            timestamp  DateTime DEFAULT now(),
-            actor      String,
-            action     String,
-            details    String
-        ) ENGINE = MergeTree()
-        ORDER BY (project_id, timestamp)
-        """
-    )
+    Same on-demand, non-fatal pattern web/server.py uses for its users table
+    (ensure_users_table) — a transient network hiccup here shouldn't crash
+    the whole agent import, especially since these tables already exist after
+    the first successful run anyway."""
+    try:
+        ch_query(
+            """
+            CREATE TABLE IF NOT EXISTS cinemalit.governance_gates (
+                project_id String,
+                gate_id    String,
+                gate_name  String,
+                status     LowCardinality(String),
+                rationale  String,
+                updated_at DateTime DEFAULT now()
+            ) ENGINE = MergeTree()
+            ORDER BY (project_id, gate_id)
+            """
+        )
+        ch_query(
+            """
+            CREATE TABLE IF NOT EXISTS cinemalit.agent_audit_log (
+                project_id String,
+                timestamp  DateTime DEFAULT now(),
+                actor      String,
+                action     String,
+                details    String
+            ) ENGINE = MergeTree()
+            ORDER BY (project_id, timestamp)
+            """
+        )
+    except Exception as exc:
+        print(f"⚠️  Could not ensure governance_gates/agent_audit_log tables: {exc}")
 
 
 _ensure_tables()
