@@ -56,6 +56,10 @@ PUBLIC_API_PATHS = {
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 ALLOW_DEV_GOOGLE_AUTH = os.getenv("ALLOW_DEV_GOOGLE_AUTH", "").lower() in ("1", "true", "yes")
+# Off by default — when true, /api/ai/chat routes through cinemalit_agent (ADK) instead of
+# calling genai_client directly. Every other AI handler still uses genai_client either way;
+# see agents.md for what's migrated vs not.
+USE_ADK_AGENT = os.getenv("USE_ADK_AGENT", "").lower() in ("1", "true", "yes")
 genai_client = None
 
 if GOOGLE_API_KEY:
@@ -469,7 +473,11 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         data = self._read_json()
         user_msg = data.get("message", "")
         try:
-            if genai_client:
+            if USE_ADK_AGENT:
+                from cinemalit_agent.bridge import ask_agent
+                reply_text = ask_agent(user_msg)
+                source = f"{GEMINI_MODEL} (ADK Agent)"
+            elif genai_client:
                 from google.genai import types
                 
                 system_prompt = (
