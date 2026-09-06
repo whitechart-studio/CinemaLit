@@ -105,6 +105,28 @@ CREATE TABLE IF NOT EXISTS storyboards (
 ) ENGINE = MergeTree()
 ORDER BY (project_id, scene_num, frame_num);
 
+-- 9. Governance Gates Table (used by cinemalit_agent's request_gate_approval tool)
+CREATE TABLE IF NOT EXISTS governance_gates (
+    project_id String,
+    gate_id    String,
+    gate_name  String,
+    status     LowCardinality(String),
+    rationale  String,
+    updated_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY (project_id, gate_id);
+
+-- 10. Agent Audit Log Table (used by cinemalit_agent's analyze_script/
+-- request_gate_approval tools to record decisions, and get_audit_log to read them back)
+CREATE TABLE IF NOT EXISTS agent_audit_log (
+    project_id String,
+    timestamp  DateTime DEFAULT now(),
+    actor      String,
+    action     String,
+    details    String
+) ENGINE = MergeTree()
+ORDER BY (project_id, timestamp);
+
 -- ─── SEED DATA ─────────────────────────────────────────────────────────────
 
 INSERT INTO scenes VALUES

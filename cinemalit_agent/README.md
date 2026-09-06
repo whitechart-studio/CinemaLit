@@ -11,10 +11,20 @@ it named differently from `agent.py` if you ever rename it again.
 
 ## What's here
 
-- `agent.py` — the ADK `Agent` definition (single agent, flat tool list)
+- `agent.py` — the ADK `Agent` definition (single agent, flat tool list, 20
+  tools total)
 - `tools.py` — imports the 3 tools the web chat already uses
   (`query_production_db`, `get_scene_details`, `add_scene_element` from
   `web/server.py`) — not reimplemented, reused as-is
+- `crew_tools.py` — ClickHouse-backed ports of 11 of the original 12 CLI/local
+  MCP crew tools (`cinemalit/mcp/server.py`) — same unchanged crew logic
+  (`cinemalit/crews/*.py`), but sourced from/persisted to the live ClickHouse
+  database instead of the CLI's local `.cinemalit/state.json` file, so the
+  agent (not just the CLI) can use them. `studio.ask_gemini` wasn't ported —
+  redundant once the agent itself is Gemini. Adds 2 new ClickHouse tables
+  (`governance_gates`, `agent_audit_log`) for the 2 genuinely write-capable
+  tools (`request_gate_approval`, `analyze_script`); also mirrored into
+  `scripts/setup_clickhouse_schema.sql` for documentation.
 - `mcp_tools.py` — wires in the official ClickHouse MCP server
   (`mcp-clickhouse`), run in isolation via `uvx` so its dependencies never
   conflict with this project's own `mcp<2` pin

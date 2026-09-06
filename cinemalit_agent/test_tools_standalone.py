@@ -94,13 +94,14 @@ def main() -> int:
 
     # --- 6. ADK Agent object constructs cleanly ---
     from cinemalit_agent.agent import root_agent
+    from cinemalit_agent.crew_tools import CREW_TOOLS
     all_ok &= check(
         "root_agent constructs with expected name",
         root_agent.name == "cinemalit_director",
     )
     all_ok &= check(
-        "root_agent has all 3 direct tools + the ClickHouse MCP toolset attached",
-        len(root_agent.tools) == len(CINEMALIT_TOOLS) + 1,
+        "root_agent has all 3 web-app tools + 11 crew tools + the ClickHouse MCP toolset attached",
+        len(root_agent.tools) == len(CINEMALIT_TOOLS) + len(CREW_TOOLS) + 1,
         f"tools={root_agent.tools}",
     )
 
