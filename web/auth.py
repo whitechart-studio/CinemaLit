@@ -7,10 +7,16 @@ import hmac
 import json
 import os
 import secrets
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 if not JWT_SECRET:

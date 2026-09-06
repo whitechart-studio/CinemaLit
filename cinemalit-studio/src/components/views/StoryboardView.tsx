@@ -219,9 +219,9 @@ export function StoryboardView() {
           fallbackFrames.push({
             id: `f-${Date.now()}-${i}`,
             frameNum: i + 1,
-            title: `Frame ${String(i + 1).padStart(2, '0')} — Gemini Keyframe`,
+            title: `Frame ${String(i + 1).padStart(2, '0')} — Local Fallback`,
             imgUrl: imgs[i % imgs.length],
-            prompt: customPrompt.trim() || `Gemini Script Analysis at ${formatTime(startSec)}`,
+            prompt: customPrompt.trim() || `Local Fallback Frame at ${formatTime(startSec)}`,
             cameraSpec: `${customLens} · Action Keyframe`,
             startSec,
             endSec,
@@ -245,9 +245,9 @@ export function StoryboardView() {
         fallbackFrames.push({
           id: `f-${Date.now()}-${i}`,
           frameNum: i + 1,
-          title: `Frame ${String(i + 1).padStart(2, '0')} — Gemini Keyframe`,
+          title: `Frame ${String(i + 1).padStart(2, '0')} — Local Fallback`,
           imgUrl: imgs[i % imgs.length],
-          prompt: customPrompt.trim() || `Gemini Script Analysis at ${formatTime(startSec)}`,
+          prompt: customPrompt.trim() || `Local Fallback Frame at ${formatTime(startSec)}`,
           cameraSpec: `${customLens} · Action Keyframe`,
           startSec,
           endSec,

@@ -95,7 +95,7 @@ export function AgentCapsule() {
         body: JSON.stringify({ message: userText }),
       });
       const data = await res.json();
-      const reply = data.reply || 'Analysis complete via Gemini Pro Engine.';
+      const reply = data.reply || (data.error ? `⚠️ ${data.error}` : '⚠️ No response received from the AI agent.');
       addAgentMessage({
         id: `am${Date.now()}`,
         role: 'agent',
@@ -106,7 +106,7 @@ export function AgentCapsule() {
       addAgentMessage({
         id: `am${Date.now()}`,
         role: 'agent',
-        text: 'Analyzing via ClickHouse memory… Budget variance found on Scene 2.',
+        text: '⚠️ Could not reach the AI agent — check that the server is running.',
         ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
     } finally {
