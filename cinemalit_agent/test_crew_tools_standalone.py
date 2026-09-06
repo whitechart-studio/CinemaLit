@@ -24,6 +24,7 @@ from cinemalit_agent.crew_tools import (
     create_production_tasks,
     request_gate_approval,
     get_audit_log,
+    ask_gemini_direct,
     query_studio_memory,
 )
 
@@ -150,6 +151,16 @@ def main() -> int:
         "get_audit_log returns entries logged by the actions above",
         any(e["action"] == "APPROVE_GATE" for e in audit_result["audit_logs"]),
         str(audit_result)[:300],
+    )
+
+    # --- ask_gemini_direct: structural check only (real Gemini auth is a
+    # separate, currently-pending concern — this just confirms the tool
+    # returns a well-formed dict either way, doesn't crash) ---
+    gemini_result = ask_gemini_direct("Say hello in 3 words.")
+    all_ok &= check(
+        "ask_gemini_direct returns a dict with 'response' or 'error', doesn't crash",
+        "response" in gemini_result or "error" in gemini_result,
+        str(gemini_result)[:200],
     )
 
     # --- query_studio_memory: dispatches correctly by keyword ---
