@@ -511,13 +511,16 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         data = self._read_json()
         script_text = data.get("scriptText", "")
         try:
-            if genai_client:
-                prompt = (
-                    "Analyze this Fountain screenplay script. Identify: high-risk scenes "
-                    "(stunts, weather, pyro, night exteriors), key props, VFX needs, "
-                    "budget watch items, and scheduling risks.\n\n"
-                    f"Screenplay:\n{script_text[:2000]}"
-                )
+            prompt = (
+                "Analyze this Fountain screenplay script. Identify: high-risk scenes "
+                "(stunts, weather, pyro, night exteriors), key props, VFX needs, "
+                "budget watch items, and scheduling risks.\n\n"
+                f"Screenplay:\n{script_text[:2000]}"
+            )
+            if USE_ADK_AGENT:
+                from cinemalit_agent.bridge import ask_agent
+                analysis = ask_agent(prompt)
+            elif genai_client:
                 response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
                 analysis = response.text.strip()
             else:
@@ -530,6 +533,25 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         data = self._read_json()
         question = data.get("question", "")
         try:
+            if USE_ADK_AGENT:
+                from cinemalit_agent.bridge import ask_agent
+                interpretation = ask_agent(
+                    f"A film producer asked: '{question}'. Use your ClickHouse tools to find the "
+                    "real answer, then give concise professional film production insight with "
+                    "specific numbers."
+                )
+                json_resp(
+                    self,
+                    {
+                        "status": "ok",
+                        "question": question,
+                        "sql": "",
+                        "data": [],
+                        "meta": [],
+                        "interpretation": interpretation,
+                    },
+                )
+                return
             if genai_client:
                 sql_prompt = (
                     f"You are a ClickHouse SQL expert for film production database '{CH_DB}'. "
@@ -577,6 +599,14 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         try:
+            if USE_ADK_AGENT:
+                from cinemalit_agent.bridge import ask_agent
+                reply = ask_agent(
+                    "Analyze and ingest this Fountain screenplay into the production database, "
+                    f"writing any new scenes you find:\n\n{script_text[:3000]}"
+                )
+                json_resp(self, {"status": "ok", "message": reply})
+                return
             if genai_client:
                 prompt = (
                     "Extract structured JSON from this Fountain screenplay. Return ONLY valid JSON:\n"
@@ -621,12 +651,15 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                 f"SELECT shoot_day, groupArray(scene_number), sum(page_count) "
                 f"FROM {CH_DB}.scenes GROUP BY shoot_day ORDER BY shoot_day"
             )
-            if genai_client:
-                audit_prompt = (
-                    "You are a DGA 1st AD Audit Agent. Audit this schedule against DGA rules "
-                    "(max 12h turnarounds, max 4.5 pages/day, night exterior turnarounds):\n"
-                    f"{json.dumps(schedule_data.get('data', []))}"
-                )
+            audit_prompt = (
+                "You are a DGA 1st AD Audit Agent. Audit this schedule against DGA rules "
+                "(max 12h turnarounds, max 4.5 pages/day, night exterior turnarounds):\n"
+                f"{json.dumps(schedule_data.get('data', []))}"
+            )
+            if USE_ADK_AGENT:
+                from cinemalit_agent.bridge import ask_agent
+                audit_text = ask_agent(audit_prompt)
+            elif genai_client:
                 resp = genai_client.models.generate_content(model=GEMINI_MODEL, contents=audit_prompt)
                 audit_text = resp.text.strip()
             else:
@@ -652,15 +685,27 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         shot_rows = ch_shots.get("data", [])
 
         try:
-            if genai_client:
+            prompt = (
+                "Generate storyboard frames matching shot list. Return ONLY valid JSON with "
+                'frames[{frameNum,title,cameraSpec,startSec,endSec,prompt}], '
+                "estimated_duration_sec, recommended_interval_sec.\n\n"
+                f"Screenplay:\n{script_snippet[:1500]}\n\n"
+                f"Shots: {json.dumps(shot_rows)}"
+            )
+            if USE_ADK_AGENT:
                 try:
-                    prompt = (
-                        "Generate storyboard frames matching shot list. Return ONLY valid JSON with "
-                        'frames[{frameNum,title,cameraSpec,startSec,endSec,prompt}], '
-                        "estimated_duration_sec, recommended_interval_sec.\n\n"
-                        f"Screenplay:\n{script_snippet[:1500]}\n\n"
-                        f"Shots: {json.dumps(shot_rows)}"
-                    )
+                    from cinemalit_agent.bridge import ask_agent
+                    resp_text = ask_agent(prompt)
+                    clean_text = resp_text.strip().strip("```json").strip("```").strip()
+                    parsed = json.loads(clean_text)
+                    raw_frames = parsed.get("frames", [])
+                    est_dur = parsed.get("estimated_duration_sec", 15)
+                    rec_int = parsed.get("recommended_interval_sec", interval_sec)
+                except Exception as api_err:
+                    print(f"⚠️ Agent error ({api_err}) — using ClickHouse shot list fallback.")
+                    raw_frames = []
+            elif genai_client:
+                try:
                     resp = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
                     clean_text = resp.text.strip().strip("```json").strip("```").strip()
                     parsed = json.loads(clean_text)

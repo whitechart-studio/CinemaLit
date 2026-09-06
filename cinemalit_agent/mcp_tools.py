@@ -1,39 +1,40 @@
 """
 ClickHouse MCP tool wiring for CinemaLit Studio's Director Agent.
 
-Runs the official ClickHouse MCP server (https://github.com/ClickHouse/mcp-clickhouse)
-as an isolated subprocess via `uvx` — it is NOT installed into this project's own
-venv. uvx resolves and runs it in its own throwaway environment, so its dependency
-versions (it pulls in a newer `mcp` SDK via fastmcp) never conflict with the
-`mcp<2` version google-adk itself requires. Requires the `uv` tool to be
-installed and on PATH wherever this agent runs (`pip install uv` is sufficient).
+Uses ClickHouse Cloud's own hosted, remote MCP server
+(https://mcp.clickhouse.cloud/mcp) over Streamable HTTP — NOT a locally
+spawned `uvx mcp-clickhouse` subprocess. This matters for the eventual cloud
+deployment: Agent Engine can't spawn local subprocesses, but it can make the
+same outbound HTTPS call this makes today, so nothing changes at deploy time.
 
-Read-only by default (CLICKHOUSE_ALLOW_WRITE_ACCESS=false) — matches the existing
-web SQL console's SELECT-only rule (web/server.py's _handle_ch_query). Writes, if
-ever needed, should go through the narrow, purpose-built add_scene_element tool
-in tools.py instead of opening general write access here.
+That remote server is ClickHouse Cloud's CONTROL-PLANE MCP server — it also
+exposes organization/billing/service/backup-management tools (get_organization_cost,
+list_service_backups, etc.) that have nothing to do with querying our
+production data and shouldn't be handed to an LLM agent. `tool_filter` scopes
+the agent down to only the 3 tools that matter: list_databases, list_tables,
+run_select_query (confirmed read-only by its own name/description — no write
+tool is exposed by this server at all, unlike the self-hosted mcp-clickhouse
+package which has an opt-in write mode).
+
+Auth: same ClickHouse username/password as everything else, via HTTP Basic
+Auth header — confirmed working directly against the endpoint before wiring
+this in.
 """
 
+import base64
 import os
 
-from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from mcp import StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
+from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 
-clickhouse_mcp_toolset = MCPToolset(
-    connection_params=StdioConnectionParams(
-        server_params=StdioServerParameters(
-            command="uvx",
-            args=["mcp-clickhouse"],
-            env={
-                "CLICKHOUSE_HOST": os.environ.get("CLICKHOUSE_HOST", "localhost"),
-                "CLICKHOUSE_PORT": os.environ.get("CLICKHOUSE_PORT", "8123"),
-                "CLICKHOUSE_USER": os.environ.get("CLICKHOUSE_USER", "default"),
-                "CLICKHOUSE_PASSWORD": os.environ.get("CLICKHOUSE_PASSWORD", ""),
-                "CLICKHOUSE_DATABASE": os.environ.get("CLICKHOUSE_DATABASE", "cinemalit"),
-                "CLICKHOUSE_ALLOW_WRITE_ACCESS": "false",
-            },
-        ),
-        timeout=30,
+_user = os.environ.get("CLICKHOUSE_USER", "default")
+_password = os.environ.get("CLICKHOUSE_PASSWORD", "")
+_basic_auth = base64.b64encode(f"{_user}:{_password}".encode()).decode()
+
+clickhouse_mcp_toolset = McpToolset(
+    connection_params=StreamableHTTPConnectionParams(
+        url="https://mcp.clickhouse.cloud/mcp",
+        headers={"Authorization": f"Basic {_basic_auth}"},
     ),
+    tool_filter=["list_databases", "list_tables", "run_select_query"],
 )

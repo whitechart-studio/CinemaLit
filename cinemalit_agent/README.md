@@ -1,8 +1,11 @@
 # CinemaLit Director Agent (ADK)
 
-Replaces `web/server.py`'s direct `google.genai` chat calls with an ADK agent,
-without changing any other part of the app. See `agents.md` at the repo root
-for the full migration plan and rollout phases.
+Every AI-calling handler in `web/server.py` (chat, script analysis, ask-data,
+sync-script-to-db, DGA check, storyboard generation) can route through this
+agent instead of calling `google.genai` directly — behind `USE_ADK_AGENT`
+(env flag, default `false` = original direct-Gemini behavior, completely
+unchanged). See `agents.md` at the repo root for full status and rollout
+history.
 
 Folder is named `cinemalit_agent`, not `agent` — naming it `agent` (matching
 the required `agent.py` filename inside) caused a real, reproduced import
@@ -11,26 +14,34 @@ it named differently from `agent.py` if you ever rename it again.
 
 ## What's here
 
-- `agent.py` — the ADK `Agent` definition (single agent, flat tool list, 20
-  tools total)
+- `agent.py` — the ADK `Agent` definition (single agent, flat tool list, 18
+  tools total: 3 web-app tools + 12 crew tools + 3 from the ClickHouse MCP
+  toolset)
 - `tools.py` — imports the 3 tools the web chat already uses
   (`query_production_db`, `get_scene_details`, `add_scene_element` from
   `web/server.py`) — not reimplemented, reused as-is
-- `crew_tools.py` — ClickHouse-backed ports of 11 of the original 12 CLI/local
-  MCP crew tools (`cinemalit/mcp/server.py`) — same unchanged crew logic
-  (`cinemalit/crews/*.py`), but sourced from/persisted to the live ClickHouse
-  database instead of the CLI's local `.cinemalit/state.json` file, so the
-  agent (not just the CLI) can use them. `studio.ask_gemini` wasn't ported —
-  redundant once the agent itself is Gemini. Adds 2 new ClickHouse tables
+- `crew_tools.py` — ClickHouse-backed ports of all 12 original CLI/local-MCP
+  crew tools (`cinemalit/mcp/server.py`), including `ask_gemini` (as
+  `ask_gemini_direct` — a freeform bypass tool, distinct from the agent's own
+  normal reasoning). Same unchanged crew logic (`cinemalit/crews/*.py`), but
+  sourced from/persisted to the live ClickHouse database instead of the CLI's
+  local `.cinemalit/state.json` file. Adds 2 new ClickHouse tables
   (`governance_gates`, `agent_audit_log`) for the 2 genuinely write-capable
   tools (`request_gate_approval`, `analyze_script`); also mirrored into
-  `scripts/setup_clickhouse_schema.sql` for documentation.
-- `mcp_tools.py` — wires in the official ClickHouse MCP server
-  (`mcp-clickhouse`), run in isolation via `uvx` so its dependencies never
-  conflict with this project's own `mcp<2` pin
-- `test_tools_standalone.py` — sanity-checks the 3 direct tools and the agent's
-  structural wiring against the live ClickHouse instance, with **no Gemini API
-  key required**. Verified passing (8/8 checks, 3 consecutive runs).
+  `scripts/setup_clickhouse_schema.sql`.
+- `mcp_tools.py` — wires in ClickHouse Cloud's own hosted, remote MCP server
+  (`https://mcp.clickhouse.cloud/mcp`, Streamable HTTP) — NOT a local `uvx`
+  subprocess. That endpoint is ClickHouse Cloud's control-plane MCP server
+  (org/billing/service management, not just data queries); `tool_filter`
+  scopes the agent down to just `list_databases`, `list_tables`,
+  `run_select_query`.
+- `bridge.py` — calls the agent in-process via ADK's `InMemoryRunner`, used by
+  `web/server.py` when `USE_ADK_AGENT=true`. Pre-deployment local bridge —
+  swap for a call to the deployed Agent Engine endpoint once actually
+  deployed.
+- `test_tools_standalone.py` / `test_crew_tools_standalone.py` — verify every
+  tool against the live ClickHouse instance, **no Gemini API key required**
+  (23 checks total, all passing).
 
 ## Setup
 
@@ -38,7 +49,6 @@ From the repo root (not inside `cinemalit_agent/`):
 
 ```bash
 .venv/Scripts/python.exe -m pip install -r cinemalit_agent/requirements.txt
-pip install uv   # provides uvx, used to run mcp-clickhouse in isolation
 cp cinemalit_agent/.env.example cinemalit_agent/.env   # then fill in real values
 ```
 
@@ -47,38 +57,29 @@ cp cinemalit_agent/.env.example cinemalit_agent/.env   # then fill in real value
 - **Writing and structurally testing the agent** (imports, tool wiring,
   ClickHouse connectivity) — no key needed. Run:
   `PYTHONPATH=. .venv/Scripts/python.exe -m cinemalit_agent.test_tools_standalone`
-- **Actually chatting with the agent** (`adk run` / `adk web`) — needs a real
-  `GOOGLE_API_KEY` in `cinemalit_agent/.env` with
-  `GOOGLE_GENAI_USE_VERTEXAI=FALSE`. This is the *same kind* of key already in
-  the root `.env` — no GCP project, billing, or `gcloud` login required for
-  this step.
+  and `-m cinemalit_agent.test_crew_tools_standalone`
+- **Actually chatting with the agent** (`adk run` / `adk web`, or the web app
+  with `USE_ADK_AGENT=true`) — needs a real `GOOGLE_API_KEY` (or Vertex AI
+  project access) in `cinemalit_agent/.env`.
 - **Deploying to Agent Engine** — needs a real GCP project with billing,
   Vertex AI API enabled, and `gcloud auth application-default login`. Not
   needed for local development, only for the later deploy phase.
 
-## Running locally (once a real API key is in `cinemalit_agent/.env`)
+## Running locally
 
-From the repo root, with the project root on `PYTHONPATH` (needed because
-`tools.py` imports `web.server`), with the venv's `Scripts/` on `PATH` (for
-`adk` and `uvx`):
+Standalone, via `adk run`/`adk web` (with the venv's `Scripts/` on `PATH`):
 
 ```bash
 export PATH="$PWD/.venv/Scripts:$PATH"
 PYTHONPATH=. adk run cinemalit_agent "What is the total budget?"
 ```
 
-or for an interactive local chat UI:
+Or through the actual web app (recommended — exercises the real integration
+point):
 
 ```bash
-PYTHONPATH=. adk web --port 8080 .
+USE_ADK_AGENT=true .venv/Scripts/python.exe -m web.server
 ```
 
-(`--port 8080` avoids colliding with `web/server.py`'s port 8000; point it at
-`.` from the repo root, or at `cinemalit_agent` directly for a single-agent
-view.) First run prompts to opt in/out of ADK's anonymous telemetry — answer
-either way, it only affects usage reporting to Google, not agent behavior.
-
-Both commands currently load and run correctly through every step except the
-final Gemini call itself, which fails with an auth error until a real
-`GOOGLE_API_KEY` replaces the placeholder — expected, and itself confirms the
-agent, its tools, and the ClickHouse MCP toolset are all wired correctly.
+Then use the app normally (chat panel, "Sync to ClickHouse" button, DGA
+check, storyboard generation, etc.) — all 6 routes through the agent.

@@ -230,6 +230,21 @@ def get_audit_log() -> dict:
     }
 
 
+def ask_gemini_direct(prompt: str) -> dict:
+    """Ask Gemini a direct, freeform creative/analytical question, bypassing
+    normal tool-calling — for open-ended writing/brainstorming requests
+    (e.g. "write an alternate ending") where forcing a specific tool doesn't
+    fit. Note: since the agent itself already runs on Gemini, prefer letting
+    it answer directly whenever a request doesn't need this bypass."""
+    from cinemalit.core.ai import GeminiClient
+
+    client = GeminiClient()
+    if not client.is_available():
+        return {"error": "GOOGLE_API_KEY is not configured.", "status": "UNCONFIGURED"}
+    response = client.generate_text(prompt, system_instruction="You are the CinemaLit Studio AI Assistant.")
+    return {"prompt": prompt, "response": response or "Failed to retrieve response from Gemini API."}
+
+
 def query_studio_memory(query: str) -> dict:
     """Query structured studio knowledge — budget, schedule, risk, or scene
     summaries — computed fresh from live ClickHouse data."""
@@ -256,5 +271,6 @@ CREW_TOOLS = [
     create_production_tasks,
     request_gate_approval,
     get_audit_log,
+    ask_gemini_direct,
     query_studio_memory,
 ]
