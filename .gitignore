@@ -37,6 +37,9 @@ ENV/
 .cinemalit/
 test_workspace/
 
+# ADK local dev runtime state (sessions, not code)
+.adk/
+
 # Local AI agent working rules (not shared)
 agents.md
 
