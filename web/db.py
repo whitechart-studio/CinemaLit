@@ -9,11 +9,17 @@ import urllib.request
 from typing import Any, Dict, Optional
 
 CH_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
-CH_PORT = int(os.getenv("CLICKHOUSE_PORT", "8123"))
+# Same convention as the official mcp-clickhouse server: secure defaults false
+# for local Docker (unchanged behavior); set CLICKHOUSE_SECURE=true for
+# ClickHouse Cloud or any other HTTPS-only endpoint. Port follows the same
+# default-by-security convention mcp-clickhouse uses (8443 secure, 8123 not),
+# but an explicit CLICKHOUSE_PORT always wins.
+CH_SECURE = os.getenv("CLICKHOUSE_SECURE", "false").lower() in ("1", "true", "yes")
+CH_PORT = int(os.getenv("CLICKHOUSE_PORT") or (8443 if CH_SECURE else 8123))
 CH_USER = os.getenv("CLICKHOUSE_USER", "default")
 CH_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
 CH_DB = os.getenv("CLICKHOUSE_DATABASE") or os.getenv("CLICKHOUSE_DB", "cinemalit")
-CH_BASE_URL = f"http://{CH_HOST}:{CH_PORT}"
+CH_BASE_URL = f"{'https' if CH_SECURE else 'http'}://{CH_HOST}:{CH_PORT}"
 
 
 def _auth_header() -> str:

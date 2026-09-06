@@ -24,9 +24,10 @@ class ClickHouseAdapter:
     ClickHouse HTTP/SQL Client Adapter for CinemaLit Studio Memory.
     Integrates directly with official mcp-clickhouse server & ClickHouse Cloud.
     """
-    def __init__(self, host: Optional[str] = None, port: int = 8123, user: str = "default", password: str = ""):
+    def __init__(self, host: Optional[str] = None, port: int = 0, user: str = "default", password: str = ""):
+        self.secure = os.environ.get("CLICKHOUSE_SECURE", "false").lower() in ("1", "true", "yes")
         self.host = host or os.environ.get("CLICKHOUSE_HOST", "localhost")
-        self.port = port or int(os.environ.get("CLICKHOUSE_PORT", "8123"))
+        self.port = port or int(os.environ.get("CLICKHOUSE_PORT") or (8443 if self.secure else 8123))
         self.user = user or os.environ.get("CLICKHOUSE_USER", "default")
         self.password = password or os.environ.get("CLICKHOUSE_PASSWORD", "")
         self.database = os.environ.get("CLICKHOUSE_DATABASE") or os.environ.get("CLICKHOUSE_DB", "cinemalit")
@@ -37,7 +38,8 @@ class ClickHouseAdapter:
         if not self.host:
             return None
 
-        url = f"http://{self.host}:{self.port}/?query={urllib.parse.quote(sql_query + ' FORMAT JSON')}"
+        protocol = "https" if self.secure else "http"
+        url = f"{protocol}://{self.host}:{self.port}/?query={urllib.parse.quote(sql_query + ' FORMAT JSON')}"
         req = urllib.request.Request(url)
         if self.user and self.password:
             import base64
