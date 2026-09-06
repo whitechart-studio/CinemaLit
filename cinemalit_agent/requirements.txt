@@ -1,0 +1,12 @@
+# Install into the SAME venv as the rest of the project (agent/tools.py imports
+# from web/server.py, so the project root must be on PYTHONPATH — see README.md).
+#
+# google-adk's [mcp] extra pins the `mcp` SDK to the <2 range ADK 2.x requires.
+# Do NOT `pip install mcp-clickhouse` directly into this venv — it (via fastmcp)
+# pulls in `mcp>=2`, which conflicts with google-adk. mcp-clickhouse instead runs
+# as an isolated `uvx` subprocess at agent runtime (see mcp_tools.py) and never
+# shares this venv's dependencies.
+google-adk[mcp]>=2.8.0
+
+# Provides the `uv`/`uvx` executables used to launch mcp-clickhouse in isolation.
+uv>=0.12.0
