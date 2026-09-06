@@ -476,7 +476,8 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             if USE_ADK_AGENT:
                 from cinemalit_agent.bridge import ask_agent
                 reply_text = ask_agent(user_msg)
-                source = f"{GEMINI_MODEL} (ADK Agent)"
+                from cinemalit_agent.agent import GEMINI_MODEL as AGENT_MODEL
+                source = f"{AGENT_MODEL} (ADK Agent)"
             elif genai_client:
                 from google.genai import types
                 

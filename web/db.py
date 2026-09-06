@@ -33,7 +33,7 @@ def ch_post_query(sql: str) -> dict:
         data=sql.encode("utf-8"),
         headers={"Authorization": _auth_header()},
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return {"status": "ok", "raw": resp.read().decode("utf-8")}
 
 
@@ -63,7 +63,7 @@ def ch_query(sql: str, params: Optional[Dict[str, Any]] = None, fmt: str = "JSON
         data=post_data,
         headers={"Authorization": _auth_header()},
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         body = resp.read().decode("utf-8")
         if not body.strip():
             return {"status": "ok", "data": [], "meta": [], "rows": 0}
@@ -79,7 +79,7 @@ def ch_ping() -> bool:
             f"{CH_BASE_URL}/ping",
             headers={"Authorization": _auth_header()},
         )
-        with urllib.request.urlopen(req, timeout=3) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status == 200
     except Exception:
         return False
