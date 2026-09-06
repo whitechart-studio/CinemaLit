@@ -13,6 +13,7 @@ treated as the real production path.
 """
 
 import asyncio
+import os
 
 from google.adk.runners import InMemoryRunner
 
@@ -20,11 +21,22 @@ from cinemalit_agent.agent import root_agent  # triggers cinemalit_agent/__init_
 
 _runner = InMemoryRunner(agent=root_agent, app_name="cinemalit_web")
 
+# Prints each tool call/response and the final answer to the console running
+# web/server.py — off (quiet) by default so it doesn't spam a production-ish
+# run; set ADK_AGENT_VERBOSE=false to go back to silent.
+_VERBOSE = os.environ.get("ADK_AGENT_VERBOSE", "true").lower() in ("1", "true", "yes")
+
 
 def ask_agent(message: str, session_id: str = "web_default") -> str:
     """Sends one message to the Director Agent and returns its final text reply."""
     events = asyncio.run(
-        _runner.run_debug(message, user_id="web_user", session_id=session_id, quiet=True)
+        _runner.run_debug(
+            message,
+            user_id="web_user",
+            session_id=session_id,
+            quiet=not _VERBOSE,
+            verbose=_VERBOSE,
+        )
     )
     reply_parts = []
     for event in events:
