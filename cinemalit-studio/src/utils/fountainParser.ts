@@ -67,7 +67,11 @@ export function parseFountainScript(text: string): ParsedScript {
         lines[i + 1].trim() !== ''
       ) {
         const charName = line.replace(/\(.*\)/, '').trim();
-        if (charName && !['CUT TO:', 'FADE IN:', 'FADE OUT:', 'INT', 'EXT'].includes(charName)) {
+        const TRANSITION_CUES = [
+          'CUT TO:', 'FADE IN:', 'FADE OUT:', 'FADE TO:', 'DISSOLVE TO:',
+          'SMASH CUT TO:', 'MATCH CUT TO:', 'JUMP CUT TO:', 'CUT TO BLACK:', 'INT', 'EXT',
+        ];
+        if (charName && !TRANSITION_CUES.includes(charName)) {
           currentChars.add(charName);
         }
       }

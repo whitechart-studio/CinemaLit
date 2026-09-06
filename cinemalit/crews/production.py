@@ -5,7 +5,7 @@ and generates the Production Risk Radar.
 """
 
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from cinemalit.core.models import ProjectState, ProductionItem, RiskItem
 
 class ProductionCrew:

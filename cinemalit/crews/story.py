@@ -98,7 +98,7 @@ class StoryCrew:
                     if len(dialogue_snippets) < 2:
                         dialogue_snippets.append(s_line)
 
-            # Estimate page count (roughly 55 lines per screenplay page)
+            # Estimate page count (roughly 45 lines per screenplay page)
             page_count = max(0.25, round(len(block_lines) / 45.0, 2))
 
             # Synopsis from first non-empty action line

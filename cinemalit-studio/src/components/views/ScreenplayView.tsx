@@ -170,9 +170,13 @@ export function ScreenplayView() {
                       body: JSON.stringify({ scriptText: fountainText }),
                     });
                     const d = await r.json();
-                    alert(`⚡ ${d.message || 'Synced to ClickHouse!'}`);
+                    if (d.status === 'error') {
+                      alert(`⚠️ Sync failed: ${d.error || 'Unknown error'}`);
+                    } else {
+                      alert(`⚡ ${d.message || 'Synced to ClickHouse!'}`);
+                    }
                   } catch {
-                    alert('Synced script scenes to ClickHouse DB successfully.');
+                    alert('⚠️ Sync failed — could not reach the server.');
                   }
                 }}
                 title="Parse screenplay with Gemini AI and insert parsed scene records into ClickHouse DB"

@@ -94,7 +94,7 @@ export function LeftRail() {
         body: JSON.stringify({ message: promptText }),
       });
       const data = await res.json();
-      const reply = data.reply || 'Analysis complete via Gemini Pro Engine.';
+      const reply = data.reply || (data.error ? `⚠️ ${data.error}` : '⚠️ No response received from the AI agent.');
       addAgentMessage({
         id: `am${Date.now()}`,
         role: 'agent',
@@ -105,7 +105,7 @@ export function LeftRail() {
       addAgentMessage({
         id: `am${Date.now()}`,
         role: 'agent',
-        text: 'Analyzing via ClickHouse memory… Budget variance found on Scene 2.',
+        text: '⚠️ Could not reach the AI agent — check that the server is running.',
         ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
     } finally {
@@ -135,19 +135,19 @@ export function LeftRail() {
     addAgentMessage({ id: `am${Date.now()}`, role: 'user', text: '🔍 Executing DGA Rules Compliance Audit across ClickHouse schedule...', ts });
     setLoading(true);
     try {
-      const res = await apiFetch('/api/ai/dga-check');
+      const res = await apiFetch('/api/ai/dga-check', { method: 'POST' });
       const data = await res.json();
       addAgentMessage({
         id: `am${Date.now()}`,
         role: 'agent',
-        text: data.audit || 'DGA Compliance Audit Complete.',
+        text: data.audit || (data.error ? `⚠️ ${data.error}` : '⚠️ No audit result received.'),
         ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
     } catch {
       addAgentMessage({
         id: `am${Date.now()}`,
         role: 'agent',
-        text: 'DGA Audit Result: Shoot Day 1 (3.5 pages) PASS. Shoot Day 2 (Night Rain EXT) FLAG: 12-hour turnaround required.',
+        text: '⚠️ Could not reach the AI agent — check that the server is running.',
         ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
     } finally {

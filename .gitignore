@@ -37,6 +37,9 @@ ENV/
 .cinemalit/
 test_workspace/
 
+# Local AI agent working rules (not shared)
+agents.md
+
 # IDE / Editor files
 .vscode/
 .idea/

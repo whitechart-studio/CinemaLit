@@ -33,8 +33,7 @@ ORDER BY cast_id;
 -- Scene-Cast crosswalk (which actors appear in which scenes)
 CREATE TABLE IF NOT EXISTS cinemalit.scene_cast (
     scene_id        UInt32,
-    cast_id         UInt32,
-    status          LowCardinality(String)    -- W / SW / H / WF
+    cast_id         UInt32
 ) ENGINE = MergeTree()
 ORDER BY (scene_id, cast_id);
 
@@ -54,10 +53,9 @@ ORDER BY item_id;
 -- Equipment / Props
 CREATE TABLE IF NOT EXISTS cinemalit.elements (
     element_id      UInt32,
+    scene_id        UInt32,
     element_type    LowCardinality(String),   -- prop / wardrobe / vfx / sfx / vehicle / set
     name            String,
-    description     String,
-    scene_ids       Array(UInt32),
     cost_usd        Float64,
     vendor          String,
     status          LowCardinality(String),   -- planned / confirmed / booked / wrapped
@@ -105,16 +103,16 @@ INSERT INTO cinemalit.cast_members VALUES
 (7, 'Lookout',        'Kai Murakami',      'day_player',  850.0,   1);
 
 INSERT INTO cinemalit.scene_cast VALUES
-(1, 1, 'W'), (1, 2, 'SW'), (1, 5, 'W'),
-(2, 2, 'W'), (2, 4, 'W'),  (2, 6, 'W'),
-(3, 1, 'W'), (3, 5, 'W'),  (3, 7, 'W'),
-(4, 1, 'W'),
-(5, 2, 'WF'),
-(6, 1, 'W'), (6, 3, 'W'),
-(7, 1, 'W'), (7, 2, 'W'),  (7, 3, 'W'), (7, 5, 'W'),
-(8, 2, 'W'), (8, 4, 'W'),  (8, 6, 'W'),
-(9, 1, 'WF'),
-(10, 1, 'WF');
+(1, 1), (1, 2), (1, 5),
+(2, 2), (2, 4), (2, 6),
+(3, 1), (3, 5), (3, 7),
+(4, 1),
+(5, 2),
+(6, 1), (6, 3),
+(7, 1), (7, 2), (7, 3), (7, 5),
+(8, 2), (8, 4), (8, 6),
+(9, 1),
+(10, 1);
 
 INSERT INTO cinemalit.budget_items VALUES
 (1,  'Above-the-Line', 'Cast',        'James Harrow — Lead Actor',     135000, 135000, 'CAA'),
@@ -139,16 +137,26 @@ INSERT INTO cinemalit.budget_items VALUES
 (20, 'Production',     'Contingency', '10% Production Contingency',      43920,  31000, 'N/A');
 
 INSERT INTO cinemalit.elements VALUES
-(1,  'prop',      'Leather Trench Coat',   'Marcus signature coat',        [1,3,4,6,7],  2800.0,  'Prop House LA',     'confirmed'),
-(2,  'prop',      'Blank Envelope',        'Mystery envelope SC-004',      [4],           45.0,   'In-house',          'confirmed'),
-(3,  'prop',      'Jazz Trumpet',          'Elena performance instrument',  [2,8],        3200.0,  'Music Props Inc',   'confirmed'),
-(4,  'wardrobe',  'Elena Stage Dress',     '1940s noir style gown',        [2,5,7,8],    4500.0,  'Costume Design LA', 'confirmed'),
-(5,  'wardrobe',  'Detective Cole Badge',  'LAPD period badge + holster',  [6],           380.0,  'Props & More',      'booked'),
-(6,  'vfx',       'Lightning Compositing', 'CG lightning SC-003',          [3],          25000.0, 'PixelRift VFX',     'confirmed'),
-(7,  'sfx',       'Rain Machine Rig',      'Full rain machine + tanker',   [3],           8500.0, 'FX Unlimited',      'booked'),
-(8,  'sfx',       'Fog Machine Banks',     'Harbor + Alley fog systems',   [3,5],         3200.0, 'FX Unlimited',      'confirmed'),
-(9,  'vfx',       'Fire & Pyro — SC-007',  'Practical + digital fire',     [7],          38000.0, 'BlastLogic',        'confirmed'),
-(10, 'vehicle',   'Period Police Car',     '1940s Ford police cruiser',    [3,6],         6500.0, 'Classic Cars LA',   'planned');
+(1,  1, 'prop',      'Leather Trench Coat',   2800.0,  'Prop House LA',     'confirmed'),
+(2,  3, 'prop',      'Leather Trench Coat',   2800.0,  'Prop House LA',     'confirmed'),
+(3,  4, 'prop',      'Leather Trench Coat',   2800.0,  'Prop House LA',     'confirmed'),
+(4,  6, 'prop',      'Leather Trench Coat',   2800.0,  'Prop House LA',     'confirmed'),
+(5,  7, 'prop',      'Leather Trench Coat',   2800.0,  'Prop House LA',     'confirmed'),
+(6,  4, 'prop',      'Blank Envelope',          45.0,  'In-house',          'confirmed'),
+(7,  2, 'prop',      'Jazz Trumpet',          3200.0,  'Music Props Inc',   'confirmed'),
+(8,  8, 'prop',      'Jazz Trumpet',          3200.0,  'Music Props Inc',   'confirmed'),
+(9,  2, 'wardrobe',  'Elena Stage Dress',     4500.0,  'Costume Design LA', 'confirmed'),
+(10, 5, 'wardrobe',  'Elena Stage Dress',     4500.0,  'Costume Design LA', 'confirmed'),
+(11, 7, 'wardrobe',  'Elena Stage Dress',     4500.0,  'Costume Design LA', 'confirmed'),
+(12, 8, 'wardrobe',  'Elena Stage Dress',     4500.0,  'Costume Design LA', 'confirmed'),
+(13, 6, 'wardrobe',  'Detective Cole Badge',   380.0,  'Props & More',      'booked'),
+(14, 3, 'vfx',       'Lightning Compositing', 25000.0, 'PixelRift VFX',     'confirmed'),
+(15, 3, 'sfx',       'Rain Machine Rig',      8500.0,  'FX Unlimited',      'booked'),
+(16, 3, 'sfx',       'Fog Machine Banks',     3200.0,  'FX Unlimited',      'confirmed'),
+(17, 5, 'sfx',       'Fog Machine Banks',     3200.0,  'FX Unlimited',      'confirmed'),
+(18, 7, 'vfx',       'Fire & Pyro — SC-007',  38000.0, 'BlastLogic',        'confirmed'),
+(19, 3, 'vehicle',   'Period Police Car',     6500.0,  'Classic Cars LA',   'planned'),
+(20, 6, 'vehicle',   'Period Police Car',     6500.0,  'Classic Cars LA',   'planned');
 
 INSERT INTO cinemalit.shots VALUES
 (1,  1,  'SC-001-A', 85,  'Static',       'WS',   'Rooftop wide — city below, Marcus silhouette',           'complete'),

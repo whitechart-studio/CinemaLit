@@ -13,6 +13,14 @@ import re
 import uuid
 import time
 import urllib.error
+import urllib.parse
+import urllib.request
+
+# Ensure emoji/Unicode symbols in startup banners don't crash on legacy console encodings (e.g. Windows cp1252)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 # Ensure root package import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -625,6 +633,7 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         scene_num = re.sub(r"[^0-9]", "", str(data.get("sceneNum", "01"))) or "01"
         script_snippet = data.get("scriptSnippet", "")
         interval_sec = int(data.get("intervalSec", 5))
+        proj_id = data.get("projectId", "p1")
 
         ch_shots = ch_query(
             f"SELECT shot_code, lens_mm, movement, framing, description FROM {CH_DB}.shots "
@@ -689,16 +698,6 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             os.makedirs(scene_dir, exist_ok=True)
             public_scene_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "public", "storyboards", f"scene_{scene_num.zfill(2)}"))
             os.makedirs(public_scene_dir, exist_ok=True)
-
-            scene_png_map = {
-                "01": ["/sc1_f1.jpg", "/sc1_f2.jpg", "/sc1_f3.jpg"],
-                "02": ["/storyboard_sc2.jpg", "/sc1_f1.jpg"],
-                "03": ["/storyboard_sc3.jpg", "/sc1_f3.jpg"],
-                "04": ["/sc4_apartment.jpg"],
-                "05": ["/sc5_interrogation.jpg"],
-                "06": ["/sc6_docks.jpg"],
-            }
-            scene_imgs = scene_png_map.get(scene_num, ["/sc1_f1.jpg"])
 
             processed_frames = []
             for idx, fr in enumerate(raw_frames, start=1):

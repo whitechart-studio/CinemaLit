@@ -12,6 +12,12 @@ from cinemalit.core.engine import DirectorEngine
 from cinemalit.crews.story import StoryCrew
 from cinemalit.mcp.server import main as mcp_main
 
+# Ensure emoji/Unicode symbols in banners below don't crash on legacy console encodings (e.g. Windows cp1252)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 # ANSI Terminal Color Helpers
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -201,7 +207,8 @@ def main():
     # mcp
     p_mcp = subparsers.add_parser("mcp", help="Run MCP tool server")
     p_mcp_sub = p_mcp.add_subparsers(dest="mcp_command")
-    p_mcp_sub.add_parser("serve-all", help="Start stdio MCP server for Gemini & agents")
+    p_mcp_serve = p_mcp_sub.add_parser("serve-all", help="Start stdio MCP server for Gemini & agents")
+    p_mcp_serve.add_argument("--test", action="store_true", help="Print the tool manifest and exit instead of serving")
 
     # web
     subparsers.add_parser("web", help="Launch the CinemaLit Studio Web Dashboard")
