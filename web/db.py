@@ -1,4 +1,4 @@
-"""ClickHouse client helpers with parameterized queries."""
+"""ClickHouse client helpers supporting Native TCP and HTTP interfaces."""
 
 import base64
 import json
@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 CH_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
 CH_PORT = int(os.getenv("CLICKHOUSE_PORT", "8123"))
+CH_TCP_PORT = int(os.getenv("CLICKHOUSE_TCP_PORT", "9009"))
 CH_USER = os.getenv("CLICKHOUSE_USER", "default")
 CH_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
 CH_DB = os.getenv("CLICKHOUSE_DATABASE") or os.getenv("CLICKHOUSE_DB", "cinemalit")
@@ -19,6 +20,24 @@ CH_BASE_URL = f"http://{CH_HOST}:{CH_PORT}"
 def _auth_header() -> str:
     creds = base64.b64encode(f"{CH_USER}:{CH_PASSWORD}".encode()).decode()
     return f"Basic {creds}"
+
+
+def ch_native_query(sql: str, params: Optional[Dict[str, Any]] = None) -> Optional[dict]:
+    """Tries executing SQL via Native TCP protocol (port 9009/9000)."""
+    try:
+        from clickhouse_driver import Client
+        client = Client(CH_HOST, port=CH_TCP_PORT, user=CH_USER, password=CH_PASSWORD, database=CH_DB)
+        if params:
+            res = client.execute(sql, params, with_column_types=True)
+        else:
+            res = client.execute(sql, with_column_types=True)
+            
+        rows, cols = res
+        data = [list(r) for r in rows]
+        meta = [{"name": c[0], "type": c[1]} for c in cols]
+        return {"status": "ok", "data": data, "meta": meta, "rows": len(data)}
+    except Exception:
+        return None
 
 
 def ch_post_query(sql: str) -> dict:
@@ -32,7 +51,13 @@ def ch_post_query(sql: str) -> dict:
 
 
 def ch_query(sql: str, params: Optional[Dict[str, Any]] = None, fmt: str = "JSONCompact") -> dict:
-    """Execute ClickHouse SQL. Use {name:Type} placeholders + params dict for safe queries."""
+    """Execute ClickHouse SQL. Uses Native TCP first, falling back to HTTP interface."""
+    # Attempt Native TCP connection first
+    native_res = ch_native_query(sql, params)
+    if native_res is not None:
+        return native_res
+
+    # Fallback to HTTP interface
     stripped = sql.strip()
     query_params: Dict[str, Any] = {
         "database": CH_DB,
@@ -68,6 +93,10 @@ def ch_query(sql: str, params: Optional[Dict[str, Any]] = None, fmt: str = "JSON
 
 
 def ch_ping() -> bool:
+    """Check ClickHouse availability via Native TCP or HTTP ping."""
+    native_res = ch_native_query("SELECT 1")
+    if native_res is not None:
+        return True
     try:
         req = urllib.request.Request(
             f"{CH_BASE_URL}/ping",
