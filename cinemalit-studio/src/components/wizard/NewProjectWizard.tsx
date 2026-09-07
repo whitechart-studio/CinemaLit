@@ -2,36 +2,84 @@
 import { useState } from 'react';
 import {
   X, CheckCircle2, FileText, Sparkles, DollarSign,
-  Calendar, Shield, Bot, Database, ArrowRight, ArrowLeft,
+  Calendar, Shield, Bot, Database, ArrowRight, ArrowLeft, Upload, Lock,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
+import { readScriptFile, SCRIPT_ACCEPT } from '../../utils/scriptFile';
 import type { NewProjectForm } from '../../types';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import styles from './NewProjectWizard.module.css';
 
 export function NewProjectWizard() {
   const { wizardOpen, closeWizard, createProject } = useStudioStore();
   const [step, setStep] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [reading, setReading] = useState(false);
 
   const [form, setForm] = useState<NewProjectForm>({
-    name: 'Neon Echoes',
+    name: '',
     format: 'Short Film',
     genre: 'Sci-Fi Thriller',
     scriptSource: 'upload',
     scriptText: '',
-    scriptFile: 'Neon_Echoes_v3.fountain',
+    scriptFile: '',
     budgetCap: 5000,
     shootDays: 2,
     unionScale: 'SAG-AFTRA Ultra Low Budget',
     selectedAgents: ['Director Agent', 'AD Scheduling Agent', 'Budget Controller Agent'],
     clickhouseEnabled: true,
+    generateStoryboards: false,
   });
 
-  if (!wizardOpen) return null;
+  const loadScriptFile = async (file: File) => {
+    setReading(true);
+    setError('');
+    try {
+      const text = await readScriptFile(file);
+      setForm((prev) => ({ ...prev, scriptFile: file.name, scriptText: text }));
+    } catch (err) {
+      setForm((prev) => ({ ...prev, scriptFile: '', scriptText: '' }));
+      setError(err instanceof Error ? err.message : 'Could not read that file.');
+    } finally {
+      setReading(false);
+    }
+  };
 
-  const handleNext = () => {
-    if (step < 4) setStep((s) => s + 1);
-    else {
-      createProject(form);
+  // The launch button hands this straight to the agent, so an empty script
+  // would produce an empty project — block it at the step that owns it.
+  const stepBlocker = (): string => {
+    if (step === 1 && !form.name.trim()) return 'Give the production a title first.';
+    if (step === 2 && !form.scriptText.trim()) {
+      return form.scriptSource === 'upload'
+        ? 'Upload a screenplay file before continuing.'
+        : 'Describe the story before continuing.';
+    }
+    return '';
+  };
+
+  const handleNext = async () => {
+    const blocker = stepBlocker();
+    if (blocker) {
+      setError(blocker);
+      return;
+    }
+    setError('');
+    if (step < 4) {
+      setStep((s) => s + 1);
+      return;
+    }
+    setBusy(true);
+    try {
+      await createProject(form);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the project.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -49,8 +97,8 @@ export function NewProjectWizard() {
   };
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
+    <Dialog open={wizardOpen} onOpenChange={(open) => { if (!open) closeWizard(); }}>
+      <DialogContent showCloseButton={false} className={`${styles.modal} max-w-[680px] w-full p-0 gap-0`}>
         {/* WIZARD HEADER */}
         <div className={styles.header}>
           <div>
@@ -111,17 +159,21 @@ export function NewProjectWizard() {
               <div className={styles.grid2}>
                 <div className={styles.fieldGroup}>
                   <label className={styles.label}>Production Format</label>
-                  <select
-                    className={styles.select}
+                  <Select
                     value={form.format}
-                    onChange={(e) => setForm({ ...form, format: e.target.value as any })}
+                    onValueChange={(v) => setForm({ ...form, format: v as NewProjectForm['format'] })}
                   >
-                    <option value="Short Film">Short Film (Under 30 mins)</option>
-                    <option value="Feature Film">Feature Film (90+ mins)</option>
-                    <option value="TV Pilot">TV Series Pilot Episode</option>
-                    <option value="Commercial">Commercial / Brand Film</option>
-                    <option value="Music Video">Music Video</option>
-                  </select>
+                    <SelectTrigger className={`${styles.select} w-full`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Short Film">Short Film (Under 30 mins)</SelectItem>
+                      <SelectItem value="Feature Film">Feature Film (90+ mins)</SelectItem>
+                      <SelectItem value="TV Pilot">TV Series Pilot Episode</SelectItem>
+                      <SelectItem value="Commercial">Commercial / Brand Film</SelectItem>
+                      <SelectItem value="Music Video">Music Video</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className={styles.fieldGroup}>
@@ -146,30 +198,69 @@ export function NewProjectWizard() {
                 <p>Upload an existing Fountain / Final Draft script or generate one via AI treatment prompt.</p>
               </div>
 
-              <div className={styles.sourceToggle}>
-                <button
-                  className={`${styles.toggleBtn} ${form.scriptSource === 'upload' ? styles.activeToggle : ''}`}
-                  onClick={() => setForm({ ...form, scriptSource: 'upload' })}
-                >
-                  <FileText size={15} /> Upload Script File (.fountain / .fdx)
-                </button>
-                <button
-                  className={`${styles.toggleBtn} ${form.scriptSource === 'ai_prompt' ? styles.activeToggle : ''}`}
-                  onClick={() => setForm({ ...form, scriptSource: 'ai_prompt' })}
-                >
+              <ToggleGroup
+                type="single"
+                value={form.scriptSource}
+                onValueChange={(v) => { if (v) setForm({ ...form, scriptSource: v as NewProjectForm['scriptSource'] }); }}
+                className={styles.sourceToggle}
+              >
+                <ToggleGroupItem value="upload" className={styles.toggleBtn}>
+                  <FileText size={15} /> Upload Script File (.fountain / .fdx / .pdf)
+                </ToggleGroupItem>
+                <ToggleGroupItem value="ai_prompt" className={styles.toggleBtn}>
                   <Sparkles size={15} /> Generate Script via AI Prompt
-                </button>
-              </div>
+                </ToggleGroupItem>
+              </ToggleGroup>
 
               {form.scriptSource === 'upload' ? (
-                <div className={styles.uploadZone}>
-                  <FileText size={32} color="var(--gold)" />
-                  <h4>Drag &amp; Drop Screenplay File</h4>
-                  <p>Supports .fountain, .fdx (Final Draft), .pdf formats</p>
-                  <div className={styles.filePill}>
-                    <FileText size={13} color="var(--cyan)" />
-                    <span>{form.scriptFile}</span>
-                  </div>
+                <div
+                  className={styles.uploadZone}
+                  style={dragging ? { borderColor: 'var(--accent)' } : undefined}
+                  onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={(e) => {
+                    // Fires when crossing into a child too — ignore those.
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragging(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) void loadScriptFile(file);
+                  }}
+                >
+                  <input
+                    type="file"
+                    id="wizard-script-file"
+                    className={styles.hiddenFileInput}
+                    accept={SCRIPT_ACCEPT}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void loadScriptFile(file);
+                      // Reset so picking the same file twice still fires onChange.
+                      e.target.value = '';
+                    }}
+                  />
+                  <FileText size={32} color="var(--accent)" />
+                  <h4>
+                    {reading
+                      ? 'Reading screenplay…'
+                      : form.scriptFile ? 'Screenplay Loaded' : 'Upload Screenplay File'}
+                  </h4>
+                  <p>
+                    {form.scriptFile && !reading
+                      ? `${form.scriptText.split(/\r?\n/).length} lines loaded`
+                      : 'Supports .fountain, .fdx, .pdf, .txt — or drop the file here'}
+                  </p>
+                  <label htmlFor="wizard-script-file" className={styles.browseBtn}>
+                    <Upload size={13} /> {form.scriptFile ? 'Choose a different file' : 'Choose File'}
+                  </label>
+                  {form.scriptFile && (
+                    <div className={styles.filePill}>
+                      <FileText size={13} color="var(--cyan)" />
+                      <span>{form.scriptFile}</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className={styles.fieldGroup}>
@@ -178,7 +269,13 @@ export function NewProjectWizard() {
                     className={styles.textarea}
                     rows={4}
                     value={form.scriptText}
-                    onChange={(e) => setForm({ ...form, scriptText: e.target.value })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        scriptText: e.target.value,
+                        scriptFile: `${form.name || 'untitled'}.fountain`,
+                      })
+                    }
                     placeholder="Describe the story, key characters, and setting (e.g. A cyberpunk thriller where Maya and Kai meet covertly in a neon coffee shop under rain...)"
                   />
                 </div>
@@ -218,16 +315,20 @@ export function NewProjectWizard() {
 
               <div className={styles.fieldGroup} style={{ marginTop: '12px' }}>
                 <label className={styles.label}>Union Scale Agreement</label>
-                <select
-                  className={styles.select}
+                <Select
                   value={form.unionScale}
-                  onChange={(e) => setForm({ ...form, unionScale: e.target.value })}
+                  onValueChange={(v) => setForm({ ...form, unionScale: v })}
                 >
-                  <option value="SAG-AFTRA Ultra Low Budget">SAG-AFTRA Ultra Low Budget (ULB)</option>
-                  <option value="SAG-AFTRA Moderate Low Budget">SAG-AFTRA Moderate Low Budget</option>
-                  <option value="DGA Low Budget Agreement">DGA Low Budget Agreement</option>
-                  <option value="Non-Union Indie Scale">Non-Union Indie Scale</option>
-                </select>
+                  <SelectTrigger className={`${styles.select} w-full`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SAG-AFTRA Ultra Low Budget">SAG-AFTRA Ultra Low Budget (ULB)</SelectItem>
+                    <SelectItem value="SAG-AFTRA Moderate Low Budget">SAG-AFTRA Moderate Low Budget</SelectItem>
+                    <SelectItem value="DGA Low Budget Agreement">DGA Low Budget Agreement</SelectItem>
+                    <SelectItem value="Non-Union Indie Scale">Non-Union Indie Scale</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
@@ -242,7 +343,7 @@ export function NewProjectWizard() {
 
               <div className={styles.agentGrid}>
                 {[
-                  { name: 'Director Agent', role: 'Scene breakdown & creative vision', icon: <Bot size={16} color="var(--gold)" /> },
+                  { name: 'Director Agent', role: 'Scene breakdown & creative vision', icon: <Bot size={16} color="var(--accent)" /> },
                   { name: 'AD Scheduling Agent', role: 'Stripboard & DOOD optimization', icon: <Calendar size={16} color="var(--cyan)" /> },
                   { name: 'Budget Controller Agent', role: 'Real-time cost tracking & variance flags', icon: <DollarSign size={16} color="var(--grn)" /> },
                   { name: 'Stunt & Safety Agent', role: 'Risk assessment & weapon armorer notes', icon: <Shield size={16} color="var(--red)" /> },
@@ -257,7 +358,7 @@ export function NewProjectWizard() {
                       <div className={styles.agentHdr}>
                         {ag.icon}
                         <strong>{ag.name}</strong>
-                        {isSelected && <CheckCircle2 size={16} color="var(--gold)" className={styles.checkIcon} />}
+                        {isSelected && <CheckCircle2 size={16} color="var(--accent)" className={styles.checkIcon} />}
                       </div>
                       <p className={styles.agentDesc}>{ag.role}</p>
                     </div>
@@ -265,10 +366,27 @@ export function NewProjectWizard() {
                 })}
               </div>
 
-              <div className={styles.memoryBox}>
+              <label className={styles.memoryBox}>
+                <Checkbox
+                  checked={form.generateStoryboards}
+                  onCheckedChange={(checked) => setForm({ ...form, generateStoryboards: checked === true })}
+                />
+                <div>
+                  <strong>Generate AI storyboards on launch</strong>
+                  <p>
+                    Adds an AI keyframe sequence for every scene. Slower — leave this off to
+                    launch sooner and generate storyboards per scene later.
+                  </p>
+                </div>
+              </label>
+
+              <div className={styles.infoCard}>
                 <Database size={16} color="var(--cyan)" />
                 <div>
-                  <strong>ClickHouse Cloud Memory Engine</strong>
+                  <div className={styles.infoCardTitle}>
+                    <strong>ClickHouse Cloud Memory Engine</strong>
+                    <span className={styles.alwaysOnPill}><Lock size={9} /> Always On</span>
+                  </div>
                   <p>Persist project memory and scene graph query history across sessions.</p>
                 </div>
               </div>
@@ -279,16 +397,27 @@ export function NewProjectWizard() {
         {/* WIZARD FOOTER */}
         <div className={styles.footer}>
           {step > 1 ? (
-            <button className={styles.backBtn} onClick={handleBack}>
+            <button className={styles.backBtn} onClick={handleBack} disabled={busy}>
               <ArrowLeft size={14} /> Back
             </button>
           ) : <div />}
 
-          <button className={styles.nextBtn} onClick={handleNext}>
-            {step === 4 ? 'Launch Project Workbench' : 'Next Step'} <ArrowRight size={14} />
+          {error && (
+            <span style={{ color: 'var(--red)', fontSize: '12px', flex: 1, textAlign: 'center' }}>
+              {error}
+            </span>
+          )}
+
+          <button className={styles.nextBtn} onClick={handleNext} disabled={busy || reading}>
+            {busy
+              ? 'Briefing the Director Agent…'
+              : step === 4
+                ? 'Launch Project Workbench'
+                : 'Next Step'}{' '}
+            <ArrowRight size={14} />
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

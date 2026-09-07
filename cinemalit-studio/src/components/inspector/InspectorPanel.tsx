@@ -1,20 +1,44 @@
 // src/components/inspector/InspectorPanel.tsx
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
-  X, MousePointer2, ShieldCheck, FileText, ChevronDown, ChevronRight,
+  X, MousePointer2, ShieldCheck, FileText,
   Folder, LayoutDashboard, Layers, CalendarDays, Camera, DollarSign,
-  ClipboardList, Database, Download, GripVertical, Plus, Trash2, Tag,
-  CheckCircle2, Users, ChevronUp,
+  ClipboardList, Download, GripVertical, Plus, Trash2,
+  CheckCircle2, Users, Wrench, Shirt, Wand2, Volume2,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
-import type { InspectorTab, ViewId } from '../../types';
+import { useDrag } from '../../hooks/useDrag';
+import { apiFetch } from '../../utils/api';
+import type { InspectorTab, ViewId, Shot } from '../../types';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import styles from './InspectorPanel.module.css';
 
 interface Gate {
   id: string;
   name: string;
   desc: string;
-  status: 'pending' | 'approved';
+  autoApproved: boolean;
+}
+
+/** Tiny localStorage read/write, scoped per-project so edits made in the
+ *  Inspector (element costs, gate sign-offs) don't leak across projects. */
+function readLocal<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeLocal(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable — edits just won't persist across reloads */
+  }
 }
 
 interface TreeFile {
@@ -26,204 +50,259 @@ interface TreeFile {
 
 interface TreeFolder {
   name: string;
-  open: boolean;
   files: TreeFile[];
 }
+
+type ElemCategory = 'cast' | 'props' | 'ward' | 'vfx' | 'sfx';
+type PlanStatus = 'SAG-AFTRA DAY RATE' | 'RENTAL' | 'PURCHASED' | 'SAFETY / ARMORER' | 'POST-VFX PASS' | 'ON-SET PRACTICAL';
 
 interface ElementDetail {
   id: string;
   name: string;
-  category: 'cast' | 'props' | 'ward' | 'vfx' | 'sfx';
+  category: ElemCategory;
   cost: number;
-  planStatus: 'SAG-AFTRA DAY RATE' | 'RENTAL' | 'PURCHASED' | 'SAFETY / ARMORER' | 'POST-VFX PASS' | 'ON-SET PRACTICAL';
+  planStatus: PlanStatus;
   status: 'PLANNED' | 'CONFIRMED' | 'BOOKED';
   notes: string;
+  /** Derived from the scenes that actually use this element, vs. one the
+   *  user typed in manually via "Add Element". */
+  custom?: boolean;
 }
+
+const DEFAULT_PLAN_STATUS: Record<ElemCategory, PlanStatus> = {
+  cast: 'SAG-AFTRA DAY RATE',
+  props: 'RENTAL',
+  ward: 'RENTAL',
+  vfx: 'POST-VFX PASS',
+  sfx: 'ON-SET PRACTICAL',
+};
+
+/** User edits layered on top of the scene-derived element list — the only
+ *  part of the Elements matrix that isn't recomputed from scenes. */
+interface ElemLocalState {
+  overrides: Record<string, Partial<Pick<ElementDetail, 'cost' | 'status' | 'planStatus' | 'notes'>>>;
+  dismissed: string[];
+  custom: ElementDetail[];
+}
+
+// Project Explorer folder tree — static, nothing here mutates it.
+const FOLDERS: TreeFolder[] = [
+  {
+    name: '01_storyboard',
+    files: [
+      { name: 'storyboards.board', viewId: 'storyboard', icon: <Camera size={13} color="var(--accent)" /> },
+    ],
+  },
+  {
+    name: '02_boards',
+    files: [
+      { name: 'scene_flow.board', viewId: 'canvas', icon: <LayoutDashboard size={13} color="var(--accent)" /> },
+    ],
+  },
+  {
+    name: '02_script',
+    files: [
+      { name: 'script.fountain', viewId: 'script', icon: <FileText size={13} color="var(--cyan)" /> },
+    ],
+  },
+  {
+    name: '03_breakdown',
+    files: [
+      { name: 'breakdown.json', viewId: 'breakdown', icon: <Layers size={13} color="var(--pur)" /> },
+      { name: 'stripboard.json', viewId: 'stripboard', icon: <CalendarDays size={13} color="var(--accent)" /> },
+      { name: 'shot_list.csv', viewId: 'shotlist', icon: <Camera size={13} color="var(--cyan)" /> },
+    ],
+  },
+  {
+    name: '04_finance',
+    files: [
+      { name: 'budget_topsheet.xlsx', viewId: 'budget', icon: <DollarSign size={13} color="var(--grn)" /> },
+    ],
+  },
+  {
+    name: '05_production',
+    files: [
+      { name: 'call_sheet_day1.pdf', viewId: 'callsheet', icon: <ClipboardList size={13} color="var(--accent)" /> },
+      { name: 'greenlight_package.html', icon: <Download size={13} color="var(--t2)" />, isExport: true },
+    ],
+  },
+];
+
+const DEFAULT_OPEN_FOLDERS = ['01_storyboard', '02_boards', '02_script', '03_breakdown', '04_finance', '05_production'];
+
+const CATEGORY_GROUPS = [
+  { id: 'cast', label: 'CAST & ACTORS', color: 'var(--accent)', icon: <Users size={12} /> },
+  { id: 'props', label: 'PROPS & WEAPONRY', color: 'var(--cyan)', icon: <Wrench size={12} /> },
+  { id: 'ward', label: 'WARDROBE & COSTUMES', color: 'var(--pur)', icon: <Shirt size={12} /> },
+  { id: 'vfx', label: 'VISUAL EFFECTS (VFX)', color: 'var(--grn)', icon: <Wand2 size={12} /> },
+  { id: 'sfx', label: 'SPECIAL & SOUND FX (SFX)', color: 'var(--red)', icon: <Volume2 size={12} /> },
+] as const;
 
 export function InspectorPanel() {
   const {
     inspectorOpen, closeInspector, inspectorTab, setInspectorTab,
-    selectedSceneId, scenes, activeView, setActiveView,
+    selectedSceneId, scenes, activeView, setActiveView, activeProject,
   } = useStudioStore();
 
   const [panelWidth, setPanelWidth] = useState(320);
-  const isResizing = useRef(false);
-  const [expandedElemId, setExpandedElemId] = useState<string | null>('el-c1');
-
-  const [gates, setGates] = useState<Gate[]>([
-    { id: 'gate-budget', name: 'Budget Cap Gate', desc: 'Requires Director sign-off to lock $5,000 budget plan.', status: 'pending' },
-    { id: 'gate-stunt', name: 'Stunt & Rain FX Gate', desc: 'Stunt coordinator & safety team sign-off for Sc. 2.', status: 'approved' },
-    { id: 'gate-permit', name: 'Location Permit Gate', desc: 'Dock District permit issued & verified.', status: 'approved' },
-  ]);
-
-  // Detailed Element State including CAST, Props, Wardrobe, VFX, SFX
-  const [elementDetails, setElementDetails] = useState<ElementDetail[]>([
-    // CAST MEMBERS
-    { id: 'el-c1', name: 'Maya (Lead Hacker)', category: 'cast', cost: 1082, planStatus: 'SAG-AFTRA DAY RATE', status: 'BOOKED', notes: 'SAG-AFTRA ULB Scale ($1,082/day) · Stunt double booked' },
-    { id: 'el-c2', name: 'Kai (Enforcer)', category: 'cast', cost: 1082, planStatus: 'SAG-AFTRA DAY RATE', status: 'CONFIRMED', notes: 'SAG-AFTRA ULB Scale ($1,082/day) · Fight choreography pass' },
-    { id: 'el-c3', name: 'Armorer / Stunt Extra', category: 'cast', cost: 450, planStatus: 'SAFETY / ARMORER', status: 'CONFIRMED', notes: 'Certified Armorer & Stunt Safety Lead' },
-
-    // PROPS
-    { id: 'el-1', name: 'Prop Gun (licensed)', category: 'props', cost: 450, planStatus: 'SAFETY / ARMORER', status: 'CONFIRMED', notes: 'Hollywood Armory · Armorer required on-set' },
-    { id: 'el-2', name: 'Glowing Terminal', category: 'props', cost: 250, planStatus: 'ON-SET PRACTICAL', status: 'BOOKED', notes: 'CyberProps Inc · Battery pack included' },
-    { id: 'el-3', name: 'Chrome Case', category: 'props', cost: 120, planStatus: 'RENTAL', status: 'PLANNED', notes: 'PropHouse LA rental' },
-
-    // WARDROBE
-    { id: 'el-4', name: 'Maya Hacker Rig', category: 'ward', cost: 380, planStatus: 'PURCHASED', status: 'BOOKED', notes: 'Custom LED stitching' },
-    { id: 'el-5', name: 'Kai Tactical Coat', category: 'ward', cost: 290, planStatus: 'RENTAL', status: 'CONFIRMED', notes: 'Western Costume Co.' },
-
-    // VFX
-    { id: 'el-6', name: 'Cyan Neon Tubes', category: 'vfx', cost: 650, planStatus: 'ON-SET PRACTICAL', status: 'CONFIRMED', notes: 'Neon FX Specialists' },
-    { id: 'el-7', name: 'Rain Window Projection', category: 'vfx', cost: 850, planStatus: 'POST-VFX PASS', status: 'PLANNED', notes: 'Nuke composite pass' },
-
-    // SFX
-    { id: 'el-8', name: 'City Hum BG Track', category: 'sfx', cost: 150, planStatus: 'PURCHASED', status: 'BOOKED', notes: 'Freesound Pro License' },
-    { id: 'el-9', name: 'Rain Practical FX Bar', category: 'sfx', cost: 920, planStatus: 'SAFETY / ARMORER', status: 'PLANNED', notes: 'Rain machine setup + recycling tank' },
-  ]);
-
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newElemName, setNewElemName] = useState('');
-  const [newElemCat, setNewElemCat] = useState<'cast' | 'props' | 'ward' | 'vfx' | 'sfx'>('cast');
-  const [newElemCost, setNewElemCost] = useState('1082');
-  const [newElemPlan, setNewElemPlan] = useState<ElementDetail['planStatus']>('SAG-AFTRA DAY RATE');
-  const [newElemNotes, setNewElemNotes] = useState('');
-
-  const [folders, setFolders] = useState<TreeFolder[]>([
-    {
-      name: '01_storyboard',
-      open: true,
-      files: [
-        { name: 'storyboards.board', viewId: 'storyboard', icon: <Camera size={13} color="var(--gold)" /> },
-      ],
-    },
-    {
-      name: '02_boards',
-      open: true,
-      files: [
-        { name: 'scene_flow.board', viewId: 'canvas', icon: <LayoutDashboard size={13} color="var(--gold)" /> },
-      ],
-    },
-    {
-      name: '02_script',
-      open: true,
-      files: [
-        { name: 'script.fountain', viewId: 'script', icon: <FileText size={13} color="var(--cyan)" /> },
-      ],
-    },
-    {
-      name: '03_breakdown',
-      open: true,
-      files: [
-        { name: 'breakdown.json', viewId: 'breakdown', icon: <Layers size={13} color="var(--pur)" /> },
-        { name: 'stripboard.json', viewId: 'stripboard', icon: <CalendarDays size={13} color="var(--gold)" /> },
-        { name: 'shot_list.csv', viewId: 'shotlist', icon: <Camera size={13} color="var(--cyan)" /> },
-      ],
-    },
-    {
-      name: '04_finance',
-      open: true,
-      files: [
-        { name: 'budget_topsheet.xlsx', viewId: 'budget', icon: <DollarSign size={13} color="var(--grn)" /> },
-      ],
-    },
-    {
-      name: '05_production',
-      open: true,
-      files: [
-        { name: 'call_sheet_day1.pdf', viewId: 'callsheet', icon: <ClipboardList size={13} color="var(--gold)" /> },
-        { name: 'greenlight_binder.html', icon: <Download size={13} color="var(--t2)" />, isExport: true },
-      ],
-    },
-    {
-      name: '06_database',
-      open: false,
-      files: [
-        { name: 'clickhouse_memory.sql', viewId: 'sql', icon: <Database size={13} color="var(--cyan)" /> },
-      ],
-    },
-  ]);
+  const [expandedElemId, setExpandedElemId] = useState<string | null>(null);
+  const [openFolders, setOpenFolders] = useState<string[]>(DEFAULT_OPEN_FOLDERS);
 
   const selectedScene = scenes.find((s) => s.id === selectedSceneId);
 
+  // ACTION PLAN GATES — computed from the real project & scene state instead
+  // of fixed example text. Only the "approved" flag is a human decision, so
+  // that's the only part persisted (per project) across reloads.
+  const gates = useMemo<Gate[]>(() => {
+    const list: Gate[] = [
+      {
+        id: 'budget-cap',
+        name: 'Budget Cap Gate',
+        desc: `Estimated cost $${activeProject.estimatedCost.toLocaleString()} against a $${activeProject.budgetCap.toLocaleString()} cap.`,
+        autoApproved: activeProject.estimatedCost <= activeProject.budgetCap,
+      },
+    ];
+    const riskScenes = scenes.filter((s) => s.risk === 'high');
+    if (riskScenes.length > 0) {
+      list.push({
+        id: 'risk-safety',
+        name: 'High-Risk Scene Safety Gate',
+        desc: `${riskScenes.length} scene(s) flagged high-risk: ${riskScenes.map((s) => `SC.${s.num}`).join(', ')}.`,
+        autoApproved: false,
+      });
+    }
+    const uniqueCast = new Set(scenes.flatMap((s) => s.cast));
+    if (uniqueCast.size > 0) {
+      list.push({
+        id: 'cast-crew',
+        name: 'Cast & Crew Confirmation Gate',
+        desc: `${uniqueCast.size} cast member(s) across ${scenes.length} scene(s) require confirmed availability.`,
+        autoApproved: false,
+      });
+    }
+    return list;
+  }, [activeProject.estimatedCost, activeProject.budgetCap, scenes]);
+
+  const [approvedGates, setApprovedGates] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setApprovedGates(readLocal(`cinemalit:gates:${activeProject.id}`, {}));
+  }, [activeProject.id]);
+
   const approveGate = (id: string) => {
-    setGates((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, status: 'approved' } : g))
-    );
+    setApprovedGates((prev) => {
+      const next = { ...prev, [id]: true };
+      writeLocal(`cinemalit:gates:${activeProject.id}`, next);
+      return next;
+    });
   };
 
-  const toggleFolder = (idx: number) => {
-    setFolders((prev) =>
-      prev.map((f, i) => (i === idx ? { ...f, open: !f.open } : f))
-    );
+  // ELEMENT BREAKDOWN MATRIX — derived from what the scenes actually use
+  // (cast/props/wardrobe/vfx/sfx), so it tracks the current project instead
+  // of a fixed sample cast. Cost/status/notes are user-editable and
+  // persisted per project; anything typed in via "Add Element" is kept
+  // alongside the derived rows until removed.
+  const derivedElements = useMemo<ElementDetail[]>(() => {
+    const seen = new Map<string, ElementDetail>();
+    const add = (name: string, category: ElemCategory) => {
+      const id = `${category}:${name}`;
+      if (!seen.has(id)) {
+        seen.set(id, {
+          id, name, category,
+          cost: 0,
+          planStatus: DEFAULT_PLAN_STATUS[category],
+          status: 'PLANNED',
+          notes: '',
+        });
+      }
+    };
+    scenes.forEach((sc) => {
+      sc.cast.forEach((c) => add(c, 'cast'));
+      sc.props.forEach((p) => add(p, 'props'));
+      sc.ward.forEach((w) => add(w, 'ward'));
+      sc.vfx.forEach((v) => add(v, 'vfx'));
+      sc.sfx.forEach((s) => add(s, 'sfx'));
+    });
+    return Array.from(seen.values());
+  }, [scenes]);
+
+  const [elemLocal, setElemLocal] = useState<ElemLocalState>({ overrides: {}, dismissed: [], custom: [] });
+  useEffect(() => {
+    setElemLocal(readLocal(`cinemalit:elems:${activeProject.id}`, { overrides: {}, dismissed: [], custom: [] }));
+  }, [activeProject.id]);
+
+  const updateElemLocal = (updater: (prev: ElemLocalState) => ElemLocalState) => {
+    setElemLocal((prev) => {
+      const next = updater(prev);
+      writeLocal(`cinemalit:elems:${activeProject.id}`, next);
+      return next;
+    });
   };
+
+  const elementDetails: ElementDetail[] = [
+    ...derivedElements.filter((el) => !elemLocal.dismissed.includes(el.id)),
+    ...elemLocal.custom,
+  ].map((el) => ({ ...el, ...elemLocal.overrides[el.id] }));
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newElemName, setNewElemName] = useState('');
+  const [newElemCat, setNewElemCat] = useState<ElemCategory>('cast');
+  const [newElemCost, setNewElemCost] = useState('0');
+  const [newElemPlan, setNewElemPlan] = useState<PlanStatus>('RENTAL');
+  const [newElemNotes, setNewElemNotes] = useState('');
 
   const handleFileClick = (file: TreeFile) => {
     if (file.isExport) {
-      window.open('../greenlight_package.html', '_blank');
+      window.open('/greenlight_package.html', '_blank');
     } else if (file.viewId) {
       setActiveView(file.viewId);
     }
   };
 
-  // Horizontal Resize Handler for Right Inspector Panel
-  const startResizing = useCallback((e: React.MouseEvent) => {
-    isResizing.current = true;
-    e.preventDefault();
-
-    const onMouseMove = (me: MouseEvent) => {
-      if (!isResizing.current) return;
-      const newWidth = Math.max(260, Math.min(600, window.innerWidth - me.clientX));
-      setPanelWidth(newWidth);
-    };
-
-    const onMouseUp = () => {
-      isResizing.current = false;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }, []);
+  // Horizontal Resize Handler for Right Inspector Panel — shared drag hook
+  // instead of a hand-rolled window mousemove/mouseup listener pair.
+  const startResizing = useDrag({
+    onMove: (dx) => setPanelWidth((w) => Math.max(260, Math.min(600, w - dx))),
+  });
 
   // Element Actions
   const handleCostChange = (id: string, newCostStr: string) => {
     const cost = parseFloat(newCostStr) || 0;
-    setElementDetails((prev) => prev.map((el) => (el.id === id ? { ...el, cost } : el)));
+    updateElemLocal((prev) => ({ ...prev, overrides: { ...prev.overrides, [id]: { ...prev.overrides[id], cost } } }));
   };
 
   const cycleStatus = (id: string) => {
-    setElementDetails((prev) =>
-      prev.map((el) => {
-        if (el.id !== id) return el;
-        const nextStatus =
-          el.status === 'PLANNED' ? 'CONFIRMED' : el.status === 'CONFIRMED' ? 'BOOKED' : 'PLANNED';
-        return { ...el, status: nextStatus };
-      })
-    );
+    const current = elementDetails.find((el) => el.id === id);
+    if (!current) return;
+    const nextStatus =
+      current.status === 'PLANNED' ? 'CONFIRMED' : current.status === 'CONFIRMED' ? 'BOOKED' : 'PLANNED';
+    updateElemLocal((prev) => ({ ...prev, overrides: { ...prev.overrides, [id]: { ...prev.overrides[id], status: nextStatus } } }));
   };
 
   const deleteElement = (id: string) => {
-    setElementDetails((prev) => prev.filter((el) => el.id !== id));
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedElemId((prev) => (prev === id ? null : id));
+    updateElemLocal((prev) => {
+      const isCustom = prev.custom.some((el) => el.id === id);
+      return {
+        ...prev,
+        custom: prev.custom.filter((el) => el.id !== id),
+        dismissed: isCustom ? prev.dismissed : [...prev.dismissed, id],
+      };
+    });
   };
 
   const addElement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newElemName.trim()) return;
     const newElem: ElementDetail = {
-      id: `el-${Date.now()}`,
+      id: `custom-${Date.now()}`,
       name: newElemName.trim(),
       category: newElemCat,
       cost: parseFloat(newElemCost) || 0,
       planStatus: newElemPlan,
       status: 'PLANNED',
-      notes: newElemNotes.trim() || 'Custom added element',
+      notes: newElemNotes.trim(),
+      custom: true,
     };
-    setElementDetails((prev) => [...prev, newElem]);
+    updateElemLocal((prev) => ({ ...prev, custom: [...prev.custom, newElem] }));
     setNewElemName('');
     setNewElemNotes('');
     setShowAddForm(false);
@@ -232,9 +311,22 @@ export function InspectorPanel() {
 
   const totalElemCost = elementDetails.reduce((sum, el) => sum + el.cost, 0);
 
+  // SHOTS TAB — the real per-shot plan, fetched the same way ShotListView
+  // does, so the Inspector never invents an "Approved" status a shot
+  // doesn't actually have.
+  const [projectShots, setProjectShots] = useState<Shot[]>([]);
+  useEffect(() => {
+    apiFetch(`/api/clickhouse/shots?projectId=${activeProject.id}`)
+      .then((res) => res.json())
+      .then((data) => setProjectShots(data.status === 'ok' && Array.isArray(data.shots) ? data.shots : []))
+      .catch(() => setProjectShots([]));
+  }, [activeProject.id]);
+
+  if (!inspectorOpen) return null;
+
   return (
     <aside
-      className={`${styles.panel} ${inspectorOpen ? styles.open : ''}`}
+      className={styles.panel}
       style={{ width: `${panelWidth}px` }}
     >
       {/* DRAG RESIZE HANDLE ON LEFT EDGE */}
@@ -264,52 +356,51 @@ export function InspectorPanel() {
         </button>
       </div>
 
-      <div className={styles.tabs}>
-        {(['files', 'info', 'elems', 'shots', 'ai', 'plan'] as InspectorTab[]).map((tab) => (
-          <div
-            key={tab}
-            className={`${styles.tab} ${inspectorTab === tab ? styles.activeTab : ''}`}
-            onClick={() => setInspectorTab(tab)}
-          >
-            {tab.toUpperCase()}
-          </div>
-        ))}
-      </div>
+      <Tabs value={inspectorTab} onValueChange={(v) => setInspectorTab(v as InspectorTab)}>
+        <TabsList className={styles.tabs}>
+          {(['files', 'info', 'elems', 'shots', 'plan'] as InspectorTab[]).map((tab) => (
+            <TabsTrigger key={tab} value={tab} className={styles.tab}>
+              {tab.toUpperCase()}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       <div className={styles.body}>
         {/* FILES TAB: FULL PROJECT EXPLORER FOLDER TREE */}
         {inspectorTab === 'files' && (
           <div className={styles.group}>
             <div className={styles.groupTitle}>Project File Directory</div>
-            <div className={styles.treeArea}>
-              {folders.map((folder, fIdx) => (
-                <div key={folder.name} className={styles.folderGroup}>
-                  <div className={styles.folderHdr} onClick={() => toggleFolder(fIdx)}>
-                    {folder.open ? <ChevronDown size={13} className={styles.chevron} /> : <ChevronRight size={13} className={styles.chevron} />}
-                    <Folder size={13} className={styles.folderIcon} />
-                    <span>{folder.name}</span>
-                  </div>
-
-                  {folder.open && (
-                    <div className={styles.fileList}>
-                      {folder.files.map((file) => {
-                        const isActive = file.viewId && activeView === file.viewId;
-                        return (
-                          <div
-                            key={file.name}
-                            className={`${styles.fileItem} ${isActive ? styles.activeFile : ''}`}
-                            onClick={() => handleFileClick(file)}
-                          >
-                            <span className={styles.fileIcon}>{file.icon}</span>
-                            <span className={styles.fileName}>{file.name}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+            <Accordion type="multiple" value={openFolders} onValueChange={setOpenFolders} className={styles.treeArea}>
+              {FOLDERS.map((folder) => (
+                <AccordionItem key={folder.name} value={folder.name} className={styles.folderGroup}>
+                  <AccordionTrigger className={styles.folderHdr}>
+                    {/* Wrapped in one span so only the chevron (the other
+                        direct child of the trigger) rotates on open — the
+                        folder icon isn't a direct svg child anymore. */}
+                    <span className={styles.folderHdrLabel}>
+                      <Folder size={13} className={styles.folderIcon} />
+                      {folder.name}
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className={styles.fileList}>
+                    {folder.files.map((file) => {
+                      const isActive = file.viewId && activeView === file.viewId;
+                      return (
+                        <div
+                          key={file.name}
+                          className={`${styles.fileItem} ${isActive ? styles.activeFile : ''}`}
+                          onClick={() => handleFileClick(file)}
+                        >
+                          <span className={styles.fileIcon}>{file.icon}</span>
+                          <span className={styles.fileName}>{file.name}</span>
+                        </div>
+                      );
+                    })}
+                  </AccordionContent>
+                </AccordionItem>
               ))}
-            </div>
+            </Accordion>
           </div>
         )}
 
@@ -353,49 +444,47 @@ export function InspectorPanel() {
             {showAddForm && (
               <form className={styles.addForm} onSubmit={addElement}>
                 <div className={styles.formRow}>
-                  <input
+                  <Input
                     className={styles.formInput}
                     placeholder="Name (e.g. Kai or Prop Gun)"
                     value={newElemName}
                     onChange={(e) => setNewElemName(e.target.value)}
                     autoFocus
                   />
-                  <select
-                    className={styles.formSelect}
-                    value={newElemCat}
-                    onChange={(e) => setNewElemCat(e.target.value as any)}
-                  >
-                    <option value="cast">Cast / Actor</option>
-                    <option value="props">Props</option>
-                    <option value="ward">Wardrobe</option>
-                    <option value="vfx">VFX</option>
-                    <option value="sfx">SFX</option>
-                  </select>
+                  <Select value={newElemCat} onValueChange={(v) => setNewElemCat(v as ElementDetail['category'])}>
+                    <SelectTrigger size="sm" className="w-[150px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cast">Cast / Actor</SelectItem>
+                      <SelectItem value="props">Props</SelectItem>
+                      <SelectItem value="ward">Wardrobe</SelectItem>
+                      <SelectItem value="vfx">VFX</SelectItem>
+                      <SelectItem value="sfx">SFX</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className={styles.formRow}>
-                  <input
+                  <Input
                     className={styles.formInput}
                     type="number"
                     placeholder="Est. Cost ($)"
                     value={newElemCost}
                     onChange={(e) => setNewElemCost(e.target.value)}
                   />
-                  <select
-                    className={styles.formSelect}
-                    value={newElemPlan}
-                    onChange={(e) => setNewElemPlan(e.target.value as any)}
-                  >
-                    <option value="SAG-AFTRA DAY RATE">SAG-AFTRA Day Rate</option>
-                    <option value="RENTAL">Rental</option>
-                    <option value="PURCHASED">Purchased</option>
-                    <option value="SAFETY / ARMORER">Safety / Armorer</option>
-                    <option value="POST-VFX PASS">Post VFX Pass</option>
-                    <option value="ON-SET PRACTICAL">On-Set Practical</option>
-                  </select>
+                  <Select value={newElemPlan} onValueChange={(v) => setNewElemPlan(v as ElementDetail['planStatus'])}>
+                    <SelectTrigger size="sm" className="w-[190px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SAG-AFTRA DAY RATE">SAG-AFTRA Day Rate</SelectItem>
+                      <SelectItem value="RENTAL">Rental</SelectItem>
+                      <SelectItem value="PURCHASED">Purchased</SelectItem>
+                      <SelectItem value="SAFETY / ARMORER">Safety / Armorer</SelectItem>
+                      <SelectItem value="POST-VFX PASS">Post VFX Pass</SelectItem>
+                      <SelectItem value="ON-SET PRACTICAL">On-Set Practical</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <input
+                <Input
                   className={styles.formInput}
                   placeholder="Notes (e.g. SAG ULB Scale $1,082/day)"
                   value={newElemNotes}
@@ -414,71 +503,59 @@ export function InspectorPanel() {
             )}
 
             {/* CATEGORY GROUPS: CAST, PROPS, WARDROBE, VFX, SFX */}
-            {(
-              [
-                { id: 'cast', label: 'CAST & ACTORS', color: 'var(--gold)', icon: <Users size={12} /> },
-                { id: 'props', label: 'PROPS & WEAPONRY', color: 'var(--cyan)', icon: <Tag size={12} /> },
-                { id: 'ward', label: 'WARDROBE & COSTUMES', color: 'var(--pur)', icon: <Tag size={12} /> },
-                { id: 'vfx', label: 'VISUAL EFFECTS (VFX)', color: 'var(--grn)', icon: <Tag size={12} /> },
-                { id: 'sfx', label: 'SPECIAL & SOUND FX (SFX)', color: 'var(--red)', icon: <Tag size={12} /> },
-              ] as const
-            ).map((catGroup) => {
-              const catItems = elementDetails.filter((el) => el.category === catGroup.id);
-              if (catItems.length === 0) return null;
+            <Accordion type="single" collapsible value={expandedElemId ?? ''} onValueChange={(v) => setExpandedElemId(v || null)}>
+              {CATEGORY_GROUPS.map((catGroup) => {
+                const catItems = elementDetails.filter((el) => el.category === catGroup.id);
+                if (catItems.length === 0) return null;
 
-              return (
-                <div key={catGroup.id} className={styles.catGroupBlock}>
-                  <div className={styles.catGroupHeader}>
-                    <span className={styles.catDot} style={{ background: catGroup.color }} />
-                    <span className={styles.catTitle}>{catGroup.label}</span>
-                    <span className={styles.catBadge}>{catItems.length} ITEMS</span>
-                  </div>
+                return (
+                  <div key={catGroup.id} className={styles.catGroupBlock}>
+                    <div className={styles.catGroupHeader}>
+                      <span className={styles.catDot} style={{ background: catGroup.color }} />
+                      <span className={styles.catTitle}>{catGroup.label}</span>
+                      <span className={styles.catBadge}>{catItems.length} ITEMS</span>
+                    </div>
 
-                  <div className={styles.elemCardList}>
-                    {catItems.map((el) => {
-                      const isExpanded = expandedElemId === el.id;
+                    <div className={styles.elemCardList}>
+                      {catItems.map((el) => {
+                        const isExpanded = expandedElemId === el.id;
 
-                      return (
-                        <div
-                          key={el.id}
-                          className={`${styles.elemCard} ${isExpanded ? styles.elemCardExpanded : ''}`}
-                        >
-                          {/* CLICKABLE COMPACT HEADER ROW */}
-                          <div
-                            className={styles.elemCardHeaderRow}
-                            onClick={() => toggleExpand(el.id)}
-                            title="Click to view budget & procurement details"
+                        return (
+                          <AccordionItem
+                            key={el.id}
+                            value={el.id}
+                            className={`${styles.elemCard} ${isExpanded ? styles.elemCardExpanded : ''}`}
                           >
-                            <span className={styles.elemIcon} style={{ color: catGroup.color }}>
-                              {catGroup.icon}
-                            </span>
-                            <strong className={styles.elemName}>{el.name}</strong>
-
-                            <span className={styles.compactCostBadge}>
-                              ${el.cost.toLocaleString('en-US')}
-                            </span>
-
-                            <span
-                              className={`${styles.statusToggleBtn} ${
-                                el.status === 'BOOKED'
-                                  ? styles.stOk
-                                  : el.status === 'CONFIRMED'
-                                  ? styles.stWarn
-                                  : styles.stPlan
-                              }`}
+                            {/* CLICKABLE COMPACT HEADER ROW */}
+                            <AccordionTrigger
+                              className={styles.elemCardHeaderRow}
+                              title="Click to view budget & procurement details"
                             >
-                              {el.status === 'BOOKED' && <CheckCircle2 size={10} />}
-                              {el.status}
-                            </span>
+                              <span className={styles.elemIcon} style={{ color: catGroup.color }}>
+                                {catGroup.icon}
+                              </span>
+                              <strong className={styles.elemName}>{el.name}</strong>
 
-                            <span className={styles.expandChevron}>
-                              {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                            </span>
-                          </div>
+                              <span className={styles.compactCostBadge}>
+                                ${el.cost.toLocaleString('en-US')}
+                              </span>
 
-                          {/* EXPANDABLE BUDGET & PROCUREMENT PLAN DETAILS */}
-                          {isExpanded && (
-                            <div className={styles.elemExpandedBody}>
+                              <span
+                                className={`${styles.statusToggleBtn} ${
+                                  el.status === 'BOOKED'
+                                    ? styles.stOk
+                                    : el.status === 'CONFIRMED'
+                                    ? styles.stWarn
+                                    : styles.stPlan
+                                }`}
+                              >
+                                {el.status === 'BOOKED' && <CheckCircle2 size={10} />}
+                                {el.status}
+                              </span>
+                            </AccordionTrigger>
+
+                            {/* EXPANDABLE BUDGET & PROCUREMENT PLAN DETAILS */}
+                            <AccordionContent className={styles.elemExpandedBody}>
                               <div className={styles.elemDetailRow}>
                                 <span className={styles.detailLbl}>Budget Amount:</span>
                                 <div className={styles.elemCostBox}>
@@ -546,15 +623,15 @@ export function InspectorPanel() {
                                   <Trash2 size={12} /> Remove Element
                                 </button>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </Accordion>
           </div>
         )}
 
@@ -562,27 +639,34 @@ export function InspectorPanel() {
         {inspectorTab === 'plan' && (
           <div className={styles.group}>
             <div className={styles.groupTitle}>Action Plan Governance</div>
-            <div className={styles.gateList}>
-              {gates.map((g) => (
-                <div
-                  key={g.id}
-                  className={`${styles.gateCard} ${g.status === 'approved' ? styles.gateApproved : styles.gatePending}`}
-                >
-                  <div className={styles.gateHdr}>
-                    <strong>{g.name}</strong>
-                    <span className={g.status === 'approved' ? styles.badgeOk : styles.badgeWarn}>
-                      {g.status === 'approved' ? '✓ APPROVED' : 'PENDING'}
-                    </span>
-                  </div>
-                  <p className={styles.gateDesc}>{g.desc}</p>
-                  {g.status === 'pending' && (
-                    <button className={styles.approveBtn} onClick={() => approveGate(g.id)}>
-                      <ShieldCheck size={13} /> APPROVE GATE
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+            {gates.length === 0 ? (
+              <div className={styles.empty}>No scenes yet — governance gates appear once scenes are ingested.</div>
+            ) : (
+              <div className={styles.gateList}>
+                {gates.map((g) => {
+                  const approved = g.autoApproved || approvedGates[g.id] === true;
+                  return (
+                    <div
+                      key={g.id}
+                      className={`${styles.gateCard} ${approved ? styles.gateApproved : styles.gatePending}`}
+                    >
+                      <div className={styles.gateHdr}>
+                        <strong>{g.name}</strong>
+                        <span className={approved ? styles.badgeOk : styles.badgeWarn}>
+                          {approved ? '✓ APPROVED' : 'PENDING'}
+                        </span>
+                      </div>
+                      <p className={styles.gateDesc}>{g.desc}</p>
+                      {!approved && (
+                        <button className={styles.approveBtn} onClick={() => approveGate(g.id)}>
+                          <ShieldCheck size={13} /> APPROVE GATE
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -632,38 +716,38 @@ export function InspectorPanel() {
               </>
             )}
 
-            {inspectorTab === 'shots' && selectedScene && (
-              <div className={styles.group}>
-                <div className={styles.groupTitle}>Shots — SC.{selectedScene.num}</div>
-                <div style={{ fontSize: '.72rem', color: 'var(--t3)', marginBottom: '9px' }}>
-                  {selectedScene.shots} shots planned
-                </div>
-                {Array.from({ length: selectedScene.shots }, (_, j) => (
-                  <div key={j} className={styles.shotRow}>
-                    <span style={{ fontSize: '.72rem', fontWeight: 800, color: 'var(--t1)' }}>
-                      {selectedScene.num}{String.fromCharCode(65 + j)}
-                    </span>
-                    <span className={`${styles.statusPill} ${j < 2 ? styles.ssOk : styles.ssPlan}`}>
-                      {j < 2 ? '✓ Approved' : 'Planned'}
-                    </span>
-                  </div>
-                ))}
-                <button className={styles.openShotBtn} onClick={() => setActiveView('shotlist')}>
-                  Open Full Shot List →
-                </button>
-              </div>
-            )}
+            {inspectorTab === 'shots' && selectedScene && (() => {
+              const sceneShots = projectShots.filter((sh) => sh.sceneNum === selectedScene.num);
+              // Nothing loaded for this scene yet (offline, or not shot-listed
+              // yet) — show the planned count from the scene itself rather
+              // than fabricating per-shot statuses that don't exist.
+              const rows = sceneShots.length > 0
+                ? sceneShots.map((sh) => ({ label: sh.label, status: sh.status }))
+                : Array.from({ length: selectedScene.shots }, (_, j) => ({
+                    label: `${selectedScene.num}${String.fromCharCode(65 + j)}`,
+                    status: 'planned' as const,
+                  }));
 
-            {inspectorTab === 'ai' && selectedScene && (
-              <div className={styles.aiBox}>
-                <div className={styles.aiTitle}>⚡ Director Engine Analysis</div>
-                <div className={styles.aiTxt}>
-                  {selectedScene.risk === 'high'
-                    ? `Scene ${selectedScene.num} has HIGH risk. Suggest: (1) Consolidate rain locations — save ~$800. (2) Block armorer for both prop-weapon days together.`
-                    : `Scene ${selectedScene.num} is LOW risk and budget-compliant.`}
+              return (
+                <div className={styles.group}>
+                  <div className={styles.groupTitle}>Shots — SC.{selectedScene.num}</div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--t3)', marginBottom: '9px' }}>
+                    {rows.length} shot{rows.length === 1 ? '' : 's'} planned
+                  </div>
+                  {rows.map((r) => (
+                    <div key={r.label} className={styles.shotRow}>
+                      <span style={{ fontSize: '.72rem', fontWeight: 800, color: 'var(--t1)' }}>{r.label}</span>
+                      <span className={`${styles.statusPill} ${r.status === 'approved' ? styles.ssOk : styles.ssPlan}`}>
+                        {r.status === 'approved' ? '✓ Approved' : r.status === 'shot' ? '🎥 Shot' : r.status === 'setup' ? '⚙ Set Up' : 'Planned'}
+                      </span>
+                    </div>
+                  ))}
+                  <button className={styles.openShotBtn} onClick={() => setActiveView('shotlist')}>
+                    Open Full Shot List →
+                  </button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         ))}
       </div>

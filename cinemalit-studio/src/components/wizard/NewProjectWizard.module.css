@@ -1,19 +1,5 @@
 /* src/components/wizard/NewProjectWizard.module.css */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
 .modal {
-  width: 100%;
-  max-width: 680px;
   background: var(--bg-panel);
   border: 1px solid var(--border-hi);
   border-radius: 16px;
@@ -39,8 +25,8 @@
   border-radius: 4px;
   font-size: .64rem;
   font-weight: 800;
-  background: var(--gold-d);
-  color: var(--gold);
+  background: var(--accent-muted);
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: .05em;
   margin-bottom: 6px;
@@ -97,7 +83,7 @@
   color: var(--t1);
 }
 .stepDone .stepNum {
-  background: var(--gold);
+  background: var(--accent);
   color: #000;
 }
 
@@ -155,8 +141,8 @@
   transition: all .15s;
 }
 .input:focus, .select:focus, .textarea:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(203,248,62, 0.2);
 }
 
 .grid2 {
@@ -186,10 +172,10 @@
   transition: all .15s;
 }
 .toggleBtn:hover { background: var(--bg-hover); color: var(--t1); }
-.activeToggle {
-  background: var(--gold-d);
-  border-color: var(--gold);
-  color: var(--gold);
+.toggleBtn[data-state='on'] {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .uploadZone {
@@ -204,6 +190,30 @@
   gap: 6px;
   background: var(--bg-elev);
 }
+.hiddenFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.browseBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-hi);
+  background: var(--bg-hover);
+  font-size: .76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.browseBtn:hover { border-color: var(--accent); color: var(--accent); }
+
 .uploadZone h4 { font-size: .9rem; font-weight: 800; }
 .uploadZone p { font-size: .74rem; color: var(--t3); }
 
@@ -243,8 +253,8 @@
   background: var(--bg-hover);
 }
 .agentSelected {
-  border-color: var(--gold) !important;
-  background: var(--gold-d) !important;
+  border-color: var(--accent) !important;
+  background: var(--accent-muted) !important;
 }
 
 .agentHdr {
@@ -272,9 +282,46 @@
   border-radius: 8px;
   padding: 10px 12px;
   font-size: .76rem;
+  cursor: pointer;
 }
 .memoryBox strong { color: var(--cyan); display: block; }
 .memoryBox p { color: var(--t2); font-size: .72rem; margin-top: 2px; }
+
+/* Static informational card (not interactive) — deliberately distinct from
+   .memoryBox above (dashed border, no hover, no pointer cursor, "Always On"
+   pill) so it doesn't read as a second toggle. */
+.infoCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg-elev);
+  border: 1px dashed var(--border-hi);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: .76rem;
+}
+.infoCard strong { color: var(--cyan); }
+.infoCard p { color: var(--t2); font-size: .72rem; margin-top: 2px; }
+
+.infoCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alwaysOnPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--t3);
+  font-size: .58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 
 /* FOOTER */
 .footer {
@@ -304,7 +351,7 @@
   align-items: center;
   gap: 6px;
   padding: 9px 18px;
-  background: var(--gold);
+  background: var(--accent);
   color: #000;
   border-radius: 7px;
   font-size: .82rem;
@@ -312,6 +359,6 @@
   transition: all .15s;
 }
 .nextBtn:hover {
-  background: #FBBF24;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+  background: #A8D62F;
+  box-shadow: 0 0 14px rgba(203,248,62, 0.4);
 }

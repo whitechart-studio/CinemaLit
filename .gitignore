@@ -40,8 +40,21 @@ test_workspace/
 # ADK local dev runtime state (sessions, not code)
 .adk/
 
-# Local AI agent working rules (not shared)
+# Local AI agent working rules & internal working memory (not shared)
 agents.md
+PRODUCT.md
+ARCHITECTURE.md
+DESIGN.md
+
+# Locally installed agent skills & skill-manager state (not shared, machine-specific)
+.agents/
+.claude/
+.impeccable/
+skills-lock.json
+
+# Node (root has no app of its own; stray root-level installs shouldn't happen,
+# but keep this as a backstop)
+node_modules/
 
 # IDE / Editor files
 .vscode/

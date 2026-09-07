@@ -1,4 +1,7 @@
 /* src/components/canvas/SceneNode.module.css */
+/* NODE_W/NODE_H in src/constants/canvas.ts must match .node's width here
+   (and the implicit content-driven height, currently ~148px) — CSS Modules
+   can't import the TS constant, so keep these in sync by hand. */
 .node {
   position: absolute; width: 220px;
   background: var(--bg-elev);
@@ -9,7 +12,7 @@
 }
 .node:active { cursor: grabbing; }
 .node:hover { border-color: var(--border-hi); box-shadow: 0 8px 28px rgba(0,0,0,.55); }
-.selected { border-color: var(--gold) !important; box-shadow: 0 0 0 2px rgba(245,158,11,.28), 0 8px 28px rgba(0,0,0,.55) !important; }
+.selected { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(203,248,62,.28), 0 8px 28px rgba(0,0,0,.55) !important; }
 .connectFrom { border-color: var(--cyan) !important; box-shadow: 0 0 0 2px rgba(6,182,212,.28) !important; }
 
 /* NODE ACTION BAR */
@@ -37,7 +40,7 @@
   color: var(--t2);
   transition: all .14s;
 }
-.nodeActBtn:hover { background: var(--bg-hover); color: var(--gold); }
+.nodeActBtn:hover { background: var(--bg-hover); color: var(--accent); }
 .dangerAct:hover { background: var(--red-d); color: var(--red); }
 
 .header {
@@ -65,7 +68,7 @@
 }
 .badgeSin { background: rgba(74,222,128,.18); color: #4ADE80; }
 .badgeSen { background: rgba(96,165,250,.18); color: #60A5FA; }
-.badgeSed { background: rgba(245,158,11,.18); color: #F59E0B; }
+.badgeSed { background: rgba(240,160,48,.18); color: #F0A030; }
 .badgeSid { background: rgba(229,216,122,.18); color: #E5D87A; }
 
 .body { padding: 9px 9px 7px; display: flex; flex-direction: column; gap: 4px; }
@@ -78,7 +81,7 @@
 }
 .editLocInput {
   background: var(--bg-hover);
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   border-radius: 4px;
   color: var(--t1);
   font-size: .74rem;
@@ -90,7 +93,7 @@
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  background: var(--gold);
+  background: var(--accent);
   color: #000;
   display: flex;
   align-items: center;
@@ -110,6 +113,6 @@
 }
 .risk { font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
 .rLo { background: var(--grn-d); color: var(--grn); }
-.rMd { background: var(--gold-d); color: var(--gold); }
+.rMd { background: var(--accent-muted); color: var(--accent); }
 .rHi { background: var(--red-d); color: var(--red); }
 .pages { font-size: .65rem; font-weight: 700; color: var(--t3); }

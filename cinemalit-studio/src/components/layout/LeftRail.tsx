@@ -1,11 +1,11 @@
 // src/components/layout/LeftRail.tsx
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Sparkles, Paperclip, Mic, Bot, Database, ArrowUp, Loader2,
-  GripVertical, Maximize2, X,
+  Sparkles, ArrowUp, Loader2, GripVertical, Maximize2, Bot, User,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
 import { apiFetch } from '../../utils/api';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import styles from './LeftRail.module.css';
 
 // Markdown Text Renderer for clean HTML formatting
@@ -42,11 +42,10 @@ function formatMarkdown(text: string) {
 }
 
 export function LeftRail() {
-  const { agentMessages, addAgentMessage } = useStudioStore();
+  const { chatOpen, agentMessages, addAgentMessage, activeProject, user } = useStudioStore();
   const [input, setInput] = useState('');
-  const [micOn, setMicOn] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [railWidth, setRailWidth] = useState(320);
+  const [railWidth, setRailWidth] = useState(280);
   const [expandedModal, setExpandedModal] = useState(false);
 
   const isResizing = useRef(false);
@@ -65,7 +64,7 @@ export function LeftRail() {
 
     const onMouseMove = (me: MouseEvent) => {
       if (!isResizing.current) return;
-      const newWidth = Math.max(260, Math.min(560, me.clientX));
+      const newWidth = Math.max(240, Math.min(520, me.clientX));
       setRailWidth(newWidth);
     };
 
@@ -91,7 +90,7 @@ export function LeftRail() {
       const res = await apiFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: promptText }),
+        body: JSON.stringify({ message: promptText, projectId: activeProject.id }),
       });
       const data = await res.json();
       const reply = data.reply || (data.error ? `⚠️ ${data.error}` : '⚠️ No response received from the AI agent.');
@@ -117,16 +116,10 @@ export function LeftRail() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPrompt(input); }
   };
 
-  const toggleMic = () => {
-    setMicOn((v) => !v);
-    if (!micOn) setInput('🎙 Listening…');
-    else setInput('Consolidate rain scene locations to cut budget.');
-  };
-
   const quickPrompts = [
-    { label: '⚡ Rain FX Optimization', prompt: 'How can I optimize the shoot schedule for Scene 2 rain scene?' },
-    { label: '📊 Budget Cap Analysis', prompt: 'Analyze production budget topsheet and flag overage items.' },
-    { label: '📋 Review DGA Compliance', prompt: 'Run DGA Audit on current shooting schedule' },
+    { label: 'Rain FX Optimization', prompt: 'How can I optimize the shoot schedule for Scene 2 rain scene?' },
+    { label: 'Budget Cap Analysis', prompt: 'Analyze production budget topsheet and flag overage items.' },
+    { label: 'Review DGA Compliance', prompt: 'Run DGA Audit on current shooting schedule' },
   ];
 
   const runDgaAudit = async () => {
@@ -155,6 +148,37 @@ export function LeftRail() {
     }
   };
 
+  const userDisplayName = user?.name || 'You';
+
+  const chatMessages = (className: string) => (
+    <div className={className} ref={className === styles.chatLog ? chatScrollRef : undefined}>
+      {agentMessages.map((msg) => (
+        <div
+          key={msg.id}
+          className={`${styles.msgRow} ${msg.role === 'user' ? styles.userRow : styles.agentRow}`}
+        >
+          <div className={styles.msgMeta}>
+            {msg.role === 'user' ? <User size={11} /> : <Bot size={11} />}
+            <span className={styles.roleName}>{msg.role === 'user' ? userDisplayName : 'Director AI'}</span>
+            <span className={styles.timeTag}>{msg.ts}</span>
+          </div>
+          <div className={styles.msgBubble}>
+            {msg.role === 'user' ? msg.text : formatMarkdown(msg.text)}
+          </div>
+        </div>
+      ))}
+
+      {loading && (
+        <div className={styles.typingBox}>
+          <Loader2 size={14} className={styles.spinner} />
+          <span>Director AI is analyzing production state…</span>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!chatOpen) return null;
+
   return (
     <>
       <nav className={styles.rail} style={{ width: `${railWidth}px` }}>
@@ -162,7 +186,7 @@ export function LeftRail() {
         <div
           className={styles.resizer}
           onMouseDown={startResizing}
-          onDoubleClick={() => setRailWidth(320)}
+          onDoubleClick={() => setRailWidth(280)}
           title="Drag horizontally to adjust Director AI Chat Panel width (Double-click to reset)"
         >
           <GripVertical size={11} className={styles.resizerIcon} />
@@ -171,18 +195,18 @@ export function LeftRail() {
         {/* HEADER */}
         <div className={styles.header}>
           <div className={styles.brand}>
-            <Sparkles size={16} color="var(--gold)" />
-            <div>
-              <span className={styles.title}>Director AI Agent Command</span>
-              <span className={styles.modelSub}>Gemini 2.5 Pro · ClickHouse 3.8ms</span>
-            </div>
+            <Sparkles size={16} color="var(--accent)" />
+            <span className={styles.title}>Director AI</span>
           </div>
           <button className={styles.expandModalBtn} onClick={() => setExpandedModal(true)} title="Expand Chat Modal">
             <Maximize2 size={13} />
           </button>
         </div>
 
-        {/* QUICK PROMPT CHIPS */}
+        {/* SCROLLABLE CHAT MESSAGES */}
+        {chatMessages(styles.chatLog)}
+
+        {/* QUICK PROMPT CHIPS — sit just above the input, not competing with the chat for top-of-panel space */}
         <div className={styles.quickBar}>
           {quickPrompts.map((qp, i) => (
             <button
@@ -198,31 +222,6 @@ export function LeftRail() {
           ))}
         </div>
 
-        {/* SCROLLABLE CHAT MESSAGES */}
-        <div className={styles.chatLog} ref={chatScrollRef}>
-          {agentMessages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`${styles.msgRow} ${msg.role === 'user' ? styles.userRow : styles.agentRow}`}
-            >
-              <div className={styles.msgMeta}>
-                <span className={styles.roleName}>{msg.role === 'user' ? 'A. Kubrick' : '🎬 Director AI'}</span>
-                <span className={styles.timeTag}>{msg.ts}</span>
-              </div>
-              <div className={styles.msgBubble}>
-                {msg.role === 'user' ? msg.text : formatMarkdown(msg.text)}
-              </div>
-            </div>
-          ))}
-
-          {loading && (
-            <div className={styles.typingBox}>
-              <Loader2 size={14} className={styles.spinner} />
-              <span>Gemini 2.5 Pro is analyzing production state…</span>
-            </div>
-          )}
-        </div>
-
         {/* BOTTOM INPUT AREA */}
         <div className={styles.inputArea}>
           <textarea
@@ -230,91 +229,43 @@ export function LeftRail() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Ask Gemini Director Agent..."
+            placeholder="Ask Director Agent..."
             rows={2}
           />
-
-          <div className={styles.bar}>
-            <div className={styles.actions}>
-              <button className={styles.iconBtn} title="Attach Script" onClick={() => setInput('[Attached: script.fountain] ')}>
-                <Paperclip size={13} />
-              </button>
-              <button
-                className={`${styles.iconBtn} ${micOn ? styles.micOn : ''}`}
-                title="Voice Input" onClick={toggleMic}
-              >
-                <Mic size={13} />
-              </button>
-              <button className={styles.iconBtn} title="Agent Crew"><Bot size={13} /></button>
-              <button className={styles.iconBtn} title="ClickHouse Engine"><Database size={13} /></button>
-            </div>
-            <button className={styles.sendBtn} title="Send (Enter)" onClick={() => sendPrompt(input)} disabled={loading}>
-              {loading ? <Loader2 size={13} className={styles.spinner} /> : <ArrowUp size={13} />}
-            </button>
-          </div>
+          <button className={styles.sendBtn} title="Send (Enter)" onClick={() => sendPrompt(input)} disabled={loading}>
+            {loading ? <Loader2 size={13} className={styles.spinner} /> : <ArrowUp size={13} />}
+          </button>
         </div>
       </nav>
 
-      {/* FULL OVERLAY CHAT MODAL */}
-      {expandedModal && (
-        <div className={styles.drawerOverlay} onClick={() => setExpandedModal(false)}>
-          <div className={styles.drawerWindow} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.drawerHeader}>
-              <div className={styles.drawerBrand}>
-                <Sparkles size={18} color="var(--gold)" />
-                <div>
-                  <h3>Director Engine AI Agent</h3>
-                  <span className={styles.drawerSub}>Gemini 2.5 Pro · ClickHouse Vector Synced</span>
-                </div>
-              </div>
-              <button className={styles.closeBtn} onClick={() => setExpandedModal(false)}>
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className={styles.modalChatLog}>
-              {agentMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`${styles.msgRow} ${msg.role === 'user' ? styles.userRow : styles.agentRow}`}
-                >
-                  <div className={styles.msgMeta}>
-                    <span className={styles.roleName}>{msg.role === 'user' ? 'A. Kubrick' : '🎬 Director AI Agent'}</span>
-                    <span className={styles.timeTag}>{msg.ts}</span>
-                  </div>
-                  <div className={styles.msgBubble}>
-                    {msg.role === 'user' ? msg.text : formatMarkdown(msg.text)}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className={styles.drawerInputBox}>
-              <textarea
-                className={styles.textarea}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Ask Director Agent..."
-                rows={2}
-              />
-              <div className={styles.bar}>
-                <div className={styles.actions}>
-                  <button className={styles.iconBtn} title="Attach Script" onClick={() => setInput('[Attached: script.fountain] ')}>
-                    <Paperclip size={13} />
-                  </button>
-                  <button className={`${styles.iconBtn} ${micOn ? styles.micOn : ''}`} title="Voice Input" onClick={toggleMic}>
-                    <Mic size={13} />
-                  </button>
-                </div>
-                <button className={styles.sendBtn} onClick={() => sendPrompt(input)} disabled={loading}>
-                  {loading ? <Loader2 size={13} className={styles.spinner} /> : <ArrowUp size={13} />}
-                </button>
-              </div>
+      {/* FULL CHAT MODAL */}
+      <Dialog open={expandedModal} onOpenChange={setExpandedModal}>
+        <DialogContent className="flex h-[82vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+          <DialogTitle className="sr-only">Director Engine AI Agent Chat</DialogTitle>
+          <div className={styles.drawerHeader}>
+            <div className={styles.drawerBrand}>
+              <Sparkles size={18} color="var(--accent)" />
+              <h3>Director AI</h3>
             </div>
           </div>
-        </div>
-      )}
+
+          {chatMessages(styles.modalChatLog)}
+
+          <div className={styles.drawerInputBox}>
+            <textarea
+              className={styles.textarea}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Ask Director Agent..."
+              rows={2}
+            />
+            <button className={styles.sendBtn} onClick={() => sendPrompt(input)} disabled={loading}>
+              {loading ? <Loader2 size={13} className={styles.spinner} /> : <ArrowUp size={13} />}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -19,8 +19,9 @@
 }
 
 .title {
-  font-size: .88rem;
-  font-weight: 700;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -.01em;
 }
 
 .subtitle {
@@ -49,8 +50,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 34px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
+}
+
+.cardWarning {
+  padding: 10px 16px;
+  font-size: .72rem;
+  color: var(--red);
+  background: var(--red-d);
+  line-height: 1.5;
 }
 
 .sceneType {
@@ -98,7 +108,7 @@
 }
 
 .etCast { background: var(--pur-d); color: var(--pur); }
-.etProp { background: var(--gold-d); color: var(--gold); }
+.etProp { background: var(--accent-muted); color: var(--accent); }
 .etVfx  { background: var(--cyan-d); color: var(--cyan); }
 .etWard { background: var(--grn-d); color: var(--grn); }
 .etSfx  { background: var(--red-d); color: var(--red); }
@@ -107,4 +117,18 @@
   font-size: .72rem;
   color: var(--t3);
   font-style: italic;
+}
+
+.cardNoElems {
+  padding: 14px 16px;
+  font-size: .76rem;
+  color: var(--t3);
+  line-height: 1.5;
+}
+
+.empty {
+  text-align: center;
+  color: var(--t3);
+  font-size: .8rem;
+  padding: 48px 20px;
 }
