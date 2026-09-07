@@ -14,9 +14,9 @@ it named differently from `agent.py` if you ever rename it again.
 
 ## What's here
 
-- `agent.py` — the ADK `Agent` definition (single agent, flat tool list, 18
-  tools total: 3 web-app tools + 12 crew tools + 3 from the ClickHouse MCP
-  toolset)
+- `agent.py` — the ADK `Agent` definition (single agent, flat tool list, 15
+  tools total: 3 web-app tools + 12 crew tools). The ClickHouse Cloud remote
+  MCP toolset is NOT included — see `mcp_tools.py` below.
 - `tools.py` — imports the 3 tools the web chat already uses
   (`query_production_db`, `get_scene_details`, `add_scene_element` from
   `web/server.py`) — not reimplemented, reused as-is
@@ -31,10 +31,16 @@ it named differently from `agent.py` if you ever rename it again.
   `scripts/setup_clickhouse_schema.sql`.
 - `mcp_tools.py` — wires in ClickHouse Cloud's own hosted, remote MCP server
   (`https://mcp.clickhouse.cloud/mcp`, Streamable HTTP) — NOT a local `uvx`
-  subprocess. That endpoint is ClickHouse Cloud's control-plane MCP server
-  (org/billing/service management, not just data queries); `tool_filter`
-  scopes the agent down to just `list_databases`, `list_tables`,
-  `run_select_query`.
+  subprocess. **Built but not wired into `agent.py`** — its 3 tools
+  (`list_databases`, `list_tables`, `run_select_query`) all require a real
+  `serviceId`, and every call fails with "Service not found... or your
+  credentials do not grant access to it" even with an API key granted
+  Service API Reader + Basic Service API Reader roles. Root cause not fully
+  pinned down (possibly a separate services/scope selector on the key,
+  distinct from its roles) — deprioritized since the 12 crew tools already
+  give the agent full ClickHouse data access with none of this complexity.
+  Kept, not deleted; re-add `clickhouse_mcp_toolset` to `agent.py`'s tools
+  list if the permission issue ever gets resolved.
 - `bridge.py` — calls the agent in-process via ADK's `InMemoryRunner`, used by
   `web/server.py` when `USE_ADK_AGENT=true`. Pre-deployment local bridge —
   swap for a call to the deployed Agent Engine endpoint once actually

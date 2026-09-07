@@ -39,9 +39,48 @@
   margin-top: 2px;
 }
 
+.bannerRight {
+  text-align: right;
+}
+
 .rev {
   font-size: .68rem;
   color: var(--t3);
+}
+
+.daySelect {
+  margin-left: 10px;
+}
+
+.accentVal { color: var(--accent); font-weight: 700; }
+.dangerVal { color: var(--red); }
+
+.castNameCell { font-weight: 700; color: var(--t1); }
+
+.emptyNote { opacity: 0.6; font-size: .78rem; }
+
+.secNoBorder { border-bottom: none; }
+
+.scenesList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sceneRow {
+  border-radius: 5px;
+  padding: 7px 11px;
+}
+
+.sceneRowLabel {
+  font-size: .68rem;
+  font-weight: 800;
+}
+
+.sceneRowMeta {
+  font-size: .76rem;
+  color: var(--t2);
+  margin-top: 2px;
 }
 
 .printBtn {
@@ -49,7 +88,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 13px;
-  background: var(--gold);
+  background: var(--accent);
   color: #000;
   border-radius: 7px;
   font-size: .78rem;
@@ -57,7 +96,7 @@
   transition: all .15s;
   margin-top: 6px;
 }
-.printBtn:hover { background: #FBBF24; box-shadow: 0 0 14px rgba(245,158,11,.4); }
+.printBtn:hover { background: #A8D62F; box-shadow: 0 0 14px rgba(203,248,62,.4); }
 
 .sec {
   padding: 14px 22px;
@@ -69,7 +108,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .12em;
-  color: var(--gold);
+  color: var(--accent);
   margin-bottom: 9px;
 }
 
@@ -115,3 +154,44 @@
   color: var(--t2);
 }
 .table tr:hover td { background: var(--bg-hover); }
+
+/* PRINT — isolate the call sheet document itself: hide the app chrome
+   (rail, tabs, inspector, status bar) entirely, and flip the dark theme
+   to a printable light page since dark backgrounds waste ink and inverted
+   text reads worse on paper. */
+@media print {
+  body * { visibility: hidden; }
+  .view, .view * { visibility: visible; }
+  .view {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+    display: block;
+  }
+  .doc {
+    max-width: 100%;
+    width: 100%;
+    border: none;
+    border-radius: 0;
+    background: #fff;
+  }
+  .banner {
+    background: #fff !important;
+    border-bottom: 2px solid #111;
+  }
+  .prodTitle { color: #111; }
+  .dayInfo, .rev { color: #444 !important; }
+  .accentVal { color: #92660a !important; }
+  .dangerVal { color: #b91c1c !important; }
+  .fLabel, .secTitle { color: #555 !important; }
+  .fVal, .castNameCell, .sceneRowLabel { color: #111 !important; }
+  .table th { color: #555 !important; border-color: #ccc !important; }
+  .table td { color: #222 !important; border-color: #ddd !important; }
+  .sec { border-color: #ddd !important; }
+  .sceneRow { background: #f4f4f4 !important; }
+  .printBtn, .daySelect { display: none !important; }
+}

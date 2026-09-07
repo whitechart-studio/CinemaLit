@@ -33,8 +33,13 @@ def check(label: str, condition: bool, detail: str = "") -> bool:
 def main() -> int:
     all_ok = True
 
+    PROJECT_ID = "p1"
+
     # --- 1. query_production_db: real SELECT works ---
-    result = query_production_db(f"SELECT scene_number, location FROM cinemalit.scenes ORDER BY scene_number LIMIT 3")
+    result = query_production_db(
+        f"SELECT scene_number, location FROM cinemalit.scenes WHERE project_id = '{PROJECT_ID}' "
+        f"ORDER BY scene_number LIMIT 3"
+    )
     all_ok &= check(
         "query_production_db returns rows for a real SELECT",
         "data" in result and len(result["data"]) > 0,
@@ -50,7 +55,7 @@ def main() -> int:
     )
 
     # --- 3. get_scene_details: real scene lookup ---
-    details = get_scene_details("SC-001")
+    details = get_scene_details("SC-001", PROJECT_ID)
     all_ok &= check(
         "get_scene_details returns scene_info/cast/elements/shots for SC-001",
         "scene_info" in details and "error" not in details,
@@ -58,7 +63,7 @@ def main() -> int:
     )
 
     # --- 4. get_scene_details: missing scene handled gracefully ---
-    missing = get_scene_details("SC-999-DOES-NOT-EXIST")
+    missing = get_scene_details("SC-999-DOES-NOT-EXIST", PROJECT_ID)
     all_ok &= check(
         "get_scene_details handles a missing scene without crashing",
         "error" in missing,
@@ -67,7 +72,7 @@ def main() -> int:
 
     # --- 5. add_scene_element: real write, then clean up after ourselves ---
     TEST_NAME = "TEST_ELEMENT_VERIFY_STANDALONE"
-    add_result = add_scene_element("SC-001", "prop", TEST_NAME, 1.23, "test-harness")
+    add_result = add_scene_element("SC-001", "prop", TEST_NAME, 1.23, "test-harness", PROJECT_ID)
     all_ok &= check(
         "add_scene_element inserts a new element row",
         add_result.get("status") == "success",
@@ -100,8 +105,8 @@ def main() -> int:
         root_agent.name == "cinemalit_director",
     )
     all_ok &= check(
-        "root_agent has all 3 web-app tools + 11 crew tools + the ClickHouse MCP toolset attached",
-        len(root_agent.tools) == len(CINEMALIT_TOOLS) + len(CREW_TOOLS) + 1,
+        "root_agent has all 3 web-app tools + 12 crew tools attached (remote MCP toolset intentionally excluded, see agents.md)",
+        len(root_agent.tools) == len(CINEMALIT_TOOLS) + len(CREW_TOOLS),
         f"tools={root_agent.tools}",
     )
 

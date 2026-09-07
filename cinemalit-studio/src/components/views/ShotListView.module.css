@@ -5,76 +5,82 @@
 }
 
 .header {
-  height: 48px; background: var(--bg-panel);
+  height: auto;
+  min-height: 48px;
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 16px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; flex-shrink: 0;
 }
 
-.title { font-size: .88rem; font-weight: 800; color: var(--t1); }
+.titleIcon { flex-shrink: 0; }
+
+.title {
+  font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; color: var(--t1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 
 .addShotBtn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 5px 12px;
-  background: var(--gold);
+  background: var(--accent);
   color: #000;
   border-radius: 6px;
   font-size: .74rem;
   font-weight: 800;
   margin-left: auto;
+  flex-shrink: 0;
   transition: all .14s;
 }
-.addShotBtn:hover { background: #FBBF24; box-shadow: 0 0 12px rgba(245,158,11,0.4); }
+.addShotBtn:hover { background: #A8D62F; box-shadow: 0 0 12px rgba(203,248,62,0.4); }
 
-.filterChip {
-  padding: 3px 9px; border-radius: 12px; font-size: .71rem; font-weight: 700;
-  background: var(--bg-elev); border: 1px solid var(--border); color: var(--t3);
-  cursor: pointer; transition: all .14s;
+/* SCENE ACCORDION — each scene is its own collapsible group; several can be
+   open at once (unlike a single-select picker) so two scenes can be
+   compared side by side while scrolling. */
+.sceneGroup {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
 }
-.filterChip:hover { color: var(--t1); }
-.on { background: var(--gold-d); border-color: var(--gold); color: var(--gold); }
+.sceneGroup:last-child { margin-bottom: 0; }
+
+.sceneHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-elev);
+  cursor: pointer;
+  text-align: left;
+  transition: background .14s;
+}
+.sceneHeader:hover { background: var(--bg-hover); }
+
+.sceneChevron { color: var(--t3); flex-shrink: 0; transition: transform .16s; }
+.sceneChevronOpen { transform: rotate(180deg); color: var(--accent); }
+
+.sceneHeaderLabel { font-size: .84rem; font-weight: 800; color: var(--t1); }
+.sceneHeaderCount { font-size: .68rem; color: var(--t3); margin-left: auto; }
+
+.emptyPanel {
+  text-align: center; color: var(--t3); font-size: .8rem; padding: 32px 10px;
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+}
 
 .addFormRow {
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
   padding: 10px 16px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
-
-.addInput, .addSelect {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  color: var(--t1);
-  font-size: .78rem;
-  outline: none;
-}
-.addInput:focus, .addSelect:focus { border-color: var(--gold); }
-
-.submitAddBtn {
-  padding: 6px 12px;
-  background: var(--gold);
-  color: #000;
-  border-radius: 6px;
-  font-size: .76rem;
-  font-weight: 800;
-  transition: all .14s;
-}
-.submitAddBtn:hover { background: #FBBF24; }
-
-.cancelAddBtn {
-  padding: 6px 10px;
-  background: transparent;
-  color: var(--t3);
-  font-size: .76rem;
-  transition: all .14s;
-}
-.cancelAddBtn:hover { color: var(--t1); }
 
 .body { flex: 1; overflow-y: auto; padding: 16px; }
 
@@ -87,14 +93,14 @@
 
 .tyWs { background: rgba(96,165,250,.18); color: #60A5FA; }
 .tyMs { background: rgba(74,222,128,.18); color: #4ADE80; }
-.tyCu { background: rgba(245,158,11,.18); color: #F59E0B; }
+.tyCu { background: rgba(203,248,62,.18); color: #CBF83E; }
 .tyEcu { background: rgba(239,68,68,.18); color: #EF4444; }
 .tyPov { background: rgba(168,85,247,.18); color: #A855F7; }
 
 .statusPill { font-size: .64rem; font-weight: 800; padding: 3px 8px; border-radius: 10px; user-select: none; }
 .ssPlan { background: var(--bg-hover); color: var(--t3); }
 .ssSetup { background: var(--cyan-d); color: var(--cyan); }
-.ssShot { background: var(--gold-d); color: var(--gold); }
+.ssShot { background: var(--accent-muted); color: var(--accent); }
 .ssOk { background: var(--grn-d); color: var(--grn); }
 
 .storyboardBtn {
@@ -102,9 +108,9 @@
   align-items: center;
   gap: 5px;
   padding: 4px 9px;
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  color: var(--gold);
+  background: rgba(203,248,62, 0.1);
+  border: 1px solid rgba(203,248,62, 0.3);
+  color: var(--accent);
   border-radius: 5px;
   font-size: .68rem;
   font-weight: 700;
@@ -112,8 +118,8 @@
   transition: all .14s;
 }
 .storyboardBtn:hover {
-  background: rgba(251, 191, 36, 0.2);
-  border-color: var(--gold);
+  background: rgba(203,248,62, 0.2);
+  border-color: var(--accent);
   transform: translateY(-1px);
 }
 
@@ -129,19 +135,7 @@
 }
 .delRowBtn:hover { background: var(--red-d); color: var(--red); }
 
-/* Modal overlay & popup */
-.modalOverlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(6px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
+/* Modal popup (shadcn Dialog handles the overlay) */
 .modalCard {
   background: #0E0E18;
   border: 1px solid var(--border);
@@ -210,14 +204,4 @@
   font-size: .78rem;
   color: var(--t2);
   font-family: var(--mono);
-}
-
-.modalBadge {
-  font-size: .65rem;
-  font-weight: 700;
-  color: var(--gold);
-  background: rgba(251, 191, 36, 0.1);
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(251, 191, 36, 0.2);
 }

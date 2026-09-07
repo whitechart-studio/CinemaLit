@@ -5,20 +5,39 @@
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 0 6px;
   flex-shrink: 0;
-  z-index: 20;
+  z-index: var(--z-sticky);
 }
+
+.tabsScroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  height: 100%;
+  scrollbar-width: none;
+}
+.tabsScroll::-webkit-scrollbar { display: none; }
 
 .tabsWrapper {
   display: flex;
   align-items: stretch;
   gap: 2px;
-  overflow-x: auto;
   height: 100%;
 }
-.tabsWrapper::-webkit-scrollbar { height: 0; }
+
+.scrollBtn {
+  width: 22px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  background: var(--bg-panel);
+  transition: color .14s;
+}
+.scrollBtn:hover { color: var(--t1); }
 
 .tab {
   display: inline-flex;
@@ -42,7 +61,7 @@
 .tab.active {
   color: var(--t1);
   background: var(--bg-elev);
-  border-bottom-color: var(--gold);
+  border-bottom-color: var(--accent);
   font-weight: 600;
 }
 
@@ -58,6 +77,7 @@
   justify-content: center;
   color: var(--t3);
   opacity: .5;
+  cursor: pointer;
   transition: all .14s;
   margin-left: 2px;
 }
@@ -90,6 +110,7 @@
   align-items: center;
   gap: 3px;
   padding: 0 3px;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -101,6 +122,8 @@
   justify-content: center;
   color: var(--t2);
   transition: all .14s;
+  flex-shrink: 0;
+  margin: 0 2px;
 }
 .btn:hover { background: var(--bg-hover); color: var(--t1); }
-.activeBtn { color: var(--gold); background: var(--bg-active); }
+.activeBtn { color: var(--accent); background: var(--bg-active); }
