@@ -15,8 +15,8 @@ export type ViewId =
   | 'callsheet';
 
 export type InspectorTab = 'info' | 'elems' | 'shots' | 'files' | 'plan';
-export type ScreenId = 'home' | 'workbench' | 'login';
-export type HomeSection = 'hub' | 'projects' | 'agents' | 'settings';
+export type ScreenId = 'landing' | 'home' | 'workbench' | 'login';
+export type HomeSection = 'hub' | 'projects' | 'agents' | 'settings' | 'profile';
 
 export interface StudioSettings {
   studioName: string;
@@ -152,4 +152,5 @@ export interface AgentMessage {
   role: 'user' | 'agent';
   text: string;
   ts: string;
+  attachmentName?: string;
 }

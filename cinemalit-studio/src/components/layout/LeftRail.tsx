@@ -1,7 +1,7 @@
 // src/components/layout/LeftRail.tsx
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Sparkles, ArrowUp, Loader2, GripVertical, Maximize2, Bot, User,
+  Sparkles, ArrowUp, Loader2, GripVertical, Maximize2, Bot, User, Paperclip, X, FileText,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
 import { apiFetch } from '../../utils/api';
@@ -41,15 +41,49 @@ function formatMarkdown(text: string) {
   });
 }
 
+const ACCEPTED_ATTACHMENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15MB — matches server.py's cap
+
+interface PendingAttachment {
+  name: string;
+  mimeType: string;
+  base64: string; // raw base64 payload, no data: URL prefix
+}
+
 export function LeftRail() {
   const { chatOpen, agentMessages, addAgentMessage, activeProject, user } = useStudioStore();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [railWidth, setRailWidth] = useState(280);
   const [expandedModal, setExpandedModal] = useState(false);
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
+  const [attachError, setAttachError] = useState('');
 
   const isResizing = useRef(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (!ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
+      setAttachError('Only images (PNG/JPEG/WEBP/GIF) and PDF are supported.');
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachError('Attachment too large — 15MB max.');
+      return;
+    }
+    setAttachError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      setAttachment({ name: file.name, mimeType: file.type, base64 });
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -81,16 +115,22 @@ export function LeftRail() {
   const sendPrompt = async (promptText: string) => {
     if (!promptText.trim() || loading) return;
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const pendingAttachment = attachment;
 
-    addAgentMessage({ id: `am${Date.now()}`, role: 'user', text: promptText, ts });
+    addAgentMessage({ id: `am${Date.now()}`, role: 'user', text: promptText, ts, attachmentName: pendingAttachment?.name });
     setInput('');
+    setAttachment(null);
     setLoading(true);
 
     try {
       const res = await apiFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: promptText, projectId: activeProject.id }),
+        body: JSON.stringify({
+          message: promptText,
+          projectId: activeProject.id,
+          ...(pendingAttachment ? { fileData: pendingAttachment.base64, fileMimeType: pendingAttachment.mimeType } : {}),
+        }),
       });
       const data = await res.json();
       const reply = data.reply || (data.error ? `⚠️ ${data.error}` : '⚠️ No response received from the AI agent.');
@@ -163,6 +203,11 @@ export function LeftRail() {
             <span className={styles.timeTag}>{msg.ts}</span>
           </div>
           <div className={styles.msgBubble}>
+            {msg.attachmentName && (
+              <div className={styles.attachTag}>
+                <Paperclip size={10} /> {msg.attachmentName}
+              </div>
+            )}
             {msg.role === 'user' ? msg.text : formatMarkdown(msg.text)}
           </div>
         </div>
@@ -223,7 +268,22 @@ export function LeftRail() {
         </div>
 
         {/* BOTTOM INPUT AREA */}
+        {(attachment || attachError) && (
+          <div className={styles.attachPreviewRow}>
+            {attachment && (
+              <div className={styles.attachChip}>
+                {attachment.mimeType === 'application/pdf' ? <FileText size={11} /> : <Paperclip size={11} />}
+                <span>{attachment.name}</span>
+                <button onClick={() => setAttachment(null)} title="Remove attachment"><X size={11} /></button>
+              </div>
+            )}
+            {attachError && <span className={styles.attachError}>{attachError}</span>}
+          </div>
+        )}
         <div className={styles.inputArea}>
+          <button className={styles.attachBtn} title="Attach an image or PDF" onClick={() => fileInputRef.current?.click()}>
+            <Paperclip size={14} />
+          </button>
           <textarea
             className={styles.textarea}
             value={input}
@@ -238,6 +298,14 @@ export function LeftRail() {
         </div>
       </nav>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_ATTACHMENT_TYPES.join(',')}
+        style={{ display: 'none' }}
+        onChange={handleFileSelect}
+      />
+
       {/* FULL CHAT MODAL */}
       <Dialog open={expandedModal} onOpenChange={setExpandedModal}>
         <DialogContent className="flex h-[82vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
@@ -251,7 +319,22 @@ export function LeftRail() {
 
           {chatMessages(styles.modalChatLog)}
 
+          {(attachment || attachError) && (
+            <div className={styles.attachPreviewRow}>
+              {attachment && (
+                <div className={styles.attachChip}>
+                  {attachment.mimeType === 'application/pdf' ? <FileText size={11} /> : <Paperclip size={11} />}
+                  <span>{attachment.name}</span>
+                  <button onClick={() => setAttachment(null)} title="Remove attachment"><X size={11} /></button>
+                </div>
+              )}
+              {attachError && <span className={styles.attachError}>{attachError}</span>}
+            </div>
+          )}
           <div className={styles.drawerInputBox}>
+            <button className={styles.attachBtn} title="Attach an image or PDF" onClick={() => fileInputRef.current?.click()}>
+              <Paperclip size={14} />
+            </button>
             <textarea
               className={styles.textarea}
               value={input}

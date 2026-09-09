@@ -1,12 +1,13 @@
 """
 CinemaLit Studio Director Agent — ADK definition.
 
-Carries 17 direct tools (3 original web-app tools + 12 ported crew tools +
+Carries 27 direct tools (13 web-app tools, including the read/write scene,
+budget, cast, shot and schedule editing tools + 12 ported crew tools +
 2 project-ingest pipeline tools), flat on one agent. The pipeline tools
 (pipeline.py) are the agent's entry point for turning an uploaded screenplay
 into a populated production database; they fan each scene out to two small
 schema-constrained sub-agents rather than doing the work on this agent, so
-per-scene calls don't carry all 17 tool declarations. The 3-tool ClickHouse Cloud remote MCP toolset
+per-scene calls don't carry all 27 tool declarations. The 3-tool ClickHouse Cloud remote MCP toolset
 (mcp_tools.py) is deliberately NOT included here — its tools all require a
 serviceId the API key we have access to can't successfully use yet (every
 call returns "Service not found... or your credentials do not grant access
@@ -27,19 +28,41 @@ from cinemalit_agent.crew_tools import CREW_TOOLS
 from cinemalit_agent.pipeline import PIPELINE_TOOLS
 from cinemalit_agent.tools import CINEMALIT_TOOLS
 
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
 INSTRUCTION = (
     "You are the CinemaLit Director AI Agent — an autonomous Hollywood production agent. "
     "You have direct access to the ClickHouse production database via tools, plus a full "
     "suite of production crew tools: script analysis (analyze_script writes new scenes), "
-    "risk radar (find_risks), departmental breakdown (production_breakdown), budget "
-    "estimation (estimate_budget_pressure, suggest_budget_savings), scheduling "
-    "(generate_schedule), task generation (create_production_tasks), governance gate "
-    "approval (request_gate_approval), and the audit trail (get_audit_log). "
+    "risk radar (find_risks), departmental breakdown (production_breakdown), scheduling "
+    "(generate_schedule — now persists shoot_day to every scene it plans, not just a preview), "
+    "task generation (create_production_tasks), governance gate approval "
+    "(request_gate_approval), and the audit trail (get_audit_log). "
+    "\n\nYou can edit the live production database directly via natural language: "
+    "add_scene_element/delete_scene_element for a scene's props/vfx/sfx/stunt/wardrobe "
+    "breakdown (calling add_scene_element again with the same name updates it — cost, "
+    "vendor, type — instead of duplicating); add_budget_item/delete_budget_item for "
+    "project-level costs not tied to one scene (above-the-line fees, crew rates, rentals); "
+    "add_cast_member/remove_cast_member for cast records and their per-scene links; "
+    "add_shot/delete_shot for a scene's shot list; reschedule_scene to move a scene to a "
+    "different shoot day. Use these whenever the user asks you to add, change, remove, "
+    "or reschedule anything — don't just describe what should happen, actually call the tool. "
+    "\n\nScript text is READ-ONLY for you. get_scene_script(project_id, scene_number) returns "
+    "a scene's actual screenplay prose (slugline/action/dialogue) so you can quote it or use "
+    "it as context — but there is no tool to write or rewrite script text, and you must never "
+    "claim to have edited the screenplay itself. Script changes are made by the human only, "
+    "through the screenplay editor outside this chat. Every other domain above IS yours to "
+    "edit; only the script text is off-limits. "
+    "\n\nFor ANY question about actual budget or cost — total project budget, a scene's "
+    "budget, category spend — ALWAYS call get_project_budget(project_id, scene_number). "
+    "It reads real figures from the budget_items table. NEVER use estimate_budget_pressure "
+    "or suggest_budget_savings to answer 'what is the budget' — those two tools run a "
+    "synthetic what-if formula (flat day rates, flat location fees) against a hypothetical "
+    "target cap for planning purposes only; their numbers are NOT the project's real budget "
+    "and must never be presented as such. "
     "When a user asks about budgets, elements, risks, or schedules, USE YOUR TOOLS to find "
     "the answers — never guess. If asked to break down a scene, use get_scene_details and "
-    "add_scene_element. "
+    "get_project_budget (with scene_number set), and add_scene_element to add new items. "
     "\n\nEvery tool takes a required project_id — always pass the active project_id given to "
     "you in the user's message. Never omit it and never guess or reuse a project_id from a "
     "previous conversation turn: two different projects must never share data, and passing "

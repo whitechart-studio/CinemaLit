@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import styles from './LoginScreen.module.css';
 
 export function LoginScreen() {
-  const { setAuth, setScreen } = useStudioStore();
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const { setAuth, setScreen, authTab } = useStudioStore();
+  const [tab, setTab] = useState<'login' | 'register'>(authTab);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -76,7 +76,14 @@ export function LoginScreen() {
         {/* LEFT PROMO HERO PANEL */}
         <div className={styles.heroPanel}>
           <div className={styles.heroBrand}>
-            <div className={styles.brandMark}><Clapperboard size={22} /></div>
+            <button
+              type="button"
+              className={styles.brandMark}
+              onClick={() => setScreen('landing')}
+              aria-label="Back to home"
+            >
+              <Clapperboard size={22} />
+            </button>
             <span className={styles.brandName}>Cinema<span>Lit</span> Studio</span>
           </div>
 
