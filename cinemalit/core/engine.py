@@ -29,20 +29,20 @@ class DirectorEngine:
         """
         state = self.state_mgr.load_state()
         state.director_intent = intent
-        self.state_mgr.log_audit("DIRECTOR", "DIRECT_INTENT", {"intent": intent})
+        self.state_mgr.log_audit("DIRECTOR", "DIRECT_INTENT", {"intent": intent}, state=state)
 
         # 1. Breakdown thinking (Story Crew)
         if not state.scenes and state.script_path and os.path.exists(state.script_path):
             with open(state.script_path, "r", encoding="utf-8") as f:
                 content = f.read()
             state.scenes = StoryCrew.parse_script(content)
-            self.state_mgr.log_audit("STORY_CREW", "EXTRACT_SCENES", {"scene_count": len(state.scenes)})
+            self.state_mgr.log_audit("STORY_CREW", "EXTRACT_SCENES", {"scene_count": len(state.scenes)}, state=state)
 
         # 2. Risk thinking (Production Crew)
         prod_items, risks = ProductionCrew.breakdown(state)
         state.production_items = prod_items
         state.risks = risks
-        self.state_mgr.log_audit("PRODUCTION_CREW", "GENERATE_RISK_RADAR", {"risk_count": len(risks)})
+        self.state_mgr.log_audit("PRODUCTION_CREW", "GENERATE_RISK_RADAR", {"risk_count": len(risks)}, state=state)
 
         # 3. Planning & Tradeoff thinking (Schedule & Budget Crew)
         target_budget = 5000.0
@@ -72,27 +72,27 @@ class DirectorEngine:
 
         # Generate schedule plan
         state.schedule = ScheduleCrew.generate_plan(state, target_days=target_days)
-        self.state_mgr.log_audit("SCHEDULE_CREW", "GENERATE_SCHEDULE", {"total_days": state.schedule.total_days})
+        self.state_mgr.log_audit("SCHEDULE_CREW", "GENERATE_SCHEDULE", {"total_days": state.schedule.total_days}, state=state)
 
         # Calculate budget pressure
         state.budget = BudgetCrew.calculate_budget(state, target_budget=target_budget)
         self.state_mgr.log_audit("BUDGET_CREW", "ESTIMATE_PRESSURE", {
             "total_estimated": state.budget.total_estimated,
             "status": state.budget.status
-        })
+        }, state=state)
 
         # 4. Action thinking (Ops Crew)
         state.tasks = OpsCrew.create_tasks(state)
-        self.state_mgr.log_audit("OPS_CREW", "CREATE_TASKS", {"task_count": len(state.tasks)})
+        self.state_mgr.log_audit("OPS_CREW", "CREATE_TASKS", {"task_count": len(state.tasks)}, state=state)
 
         # 5. Governance thinking (Governance Crew)
         state.approvals = GovernanceCrew.evaluate_gates(state)
-        self.state_mgr.log_audit("GOVERNANCE_CREW", "EVALUATE_GATES", {"gate_count": len(state.approvals)})
+        self.state_mgr.log_audit("GOVERNANCE_CREW", "EVALUATE_GATES", {"gate_count": len(state.approvals)}, state=state)
 
         # 6. Memory thinking (Studio Memory)
         memory_mgr = StudioMemoryManager(state)
         state.studio_memory = memory_mgr.get_structured_summary()
-        self.state_mgr.log_audit("STUDIO_MEMORY", "UPDATE_KNOWLEDGE_BASE", {"memory_keys": list(state.studio_memory.keys())})
+        self.state_mgr.log_audit("STUDIO_MEMORY", "UPDATE_KNOWLEDGE_BASE", {"memory_keys": list(state.studio_memory.keys())}, state=state)
 
         # 7. Gemini AI Reasoning (if GOOGLE_API_KEY is configured)
         ai_client = GeminiClient()
@@ -102,7 +102,7 @@ class DirectorEngine:
                 system_instruction="You are an Executive Producer and Director's AI Advisor."
             )
             if ai_note:
-                self.state_mgr.log_audit("GEMINI_AI", "EXECUTIVE_ADVICE", {"advice": ai_note})
+                self.state_mgr.log_audit("GEMINI_AI", "EXECUTIVE_ADVICE", {"advice": ai_note}, state=state)
 
         # Save complete state
         self.state_mgr.save_state(state)

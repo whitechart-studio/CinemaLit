@@ -21,31 +21,35 @@ from cinemalit.knowledge import (
 
 class ClickHouseAdapter:
     """
-    ClickHouse Client Adapter for CinemaLit Studio Memory.
-    Supports Native TCP & HTTP connections (Local Docker & ClickHouse Cloud).
+    ClickHouse HTTP/SQL Client Adapter for CinemaLit Studio Memory.
+    Integrates directly with official mcp-clickhouse server & ClickHouse Cloud.
     """
-    def __init__(self, host: Optional[str] = None, port: int = 8123, user: str = "cinemalit", password: str = ""):
+    def __init__(self, host: Optional[str] = None, port: int = 0, user: str = "default", password: str = ""):
+        self.secure = os.environ.get("CLICKHOUSE_SECURE", "false").lower() in ("1", "true", "yes")
         self.host = host or os.environ.get("CLICKHOUSE_HOST", "localhost")
-        self.port = port or int(os.environ.get("CLICKHOUSE_PORT", "8123"))
-        self.user = user or os.environ.get("CLICKHOUSE_USER", "cinemalit")
+        self.port = port or int(os.environ.get("CLICKHOUSE_PORT") or (8443 if self.secure else 8123))
+        self.user = user or os.environ.get("CLICKHOUSE_USER", "default")
         self.password = password or os.environ.get("CLICKHOUSE_PASSWORD", "")
         self.database = os.environ.get("CLICKHOUSE_DATABASE") or os.environ.get("CLICKHOUSE_DB", "cinemalit")
         self.mcp_server_cmd = "mcp-clickhouse"
 
     def execute_sql(self, sql_query: str) -> Optional[List[Dict[str, Any]]]:
-        """Executes a SQL query against ClickHouse using web.db helper."""
-        from web.db import ch_query
-        try:
-            res = ch_query(sql_query)
-            if res.get("status") == "ok" and "data" in res:
-                data = res.get("data", [])
-                meta = res.get("meta", [])
-                if meta and isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
-                    # Format as dict list matching ClickHouse JSON output
-                    col_names = [m["name"] for m in meta]
-                    return [dict(zip(col_names, row)) for row in data]
-                return data
+        """Executes a SQL query against ClickHouse HTTP interface."""
+        if not self.host:
             return None
+
+        protocol = "https" if self.secure else "http"
+        url = f"{protocol}://{self.host}:{self.port}/?query={urllib.parse.quote(sql_query + ' FORMAT JSON')}"
+        req = urllib.request.Request(url)
+        if self.user and self.password:
+            import base64
+            auth_header = base64.b64encode(f"{self.user}:{self.password}".encode()).decode()
+            req.add_header("Authorization", f"Basic {auth_header}")
+
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode())
+                return data.get("data", [])
         except Exception:
             return None
 

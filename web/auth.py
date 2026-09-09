@@ -7,10 +7,13 @@ import hmac
 import json
 import os
 import secrets
-import urllib.error
-import urllib.parse
-import urllib.request
+import sys
 from typing import Any, Dict, Optional
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 if not JWT_SECRET:
@@ -79,14 +82,20 @@ def verify_jwt(token: str) -> dict:
         return {}
 
 
-def verify_google_id_token(id_token: str) -> Optional[Dict[str, Any]]:
-    """Verify Google OAuth ID token via tokeninfo endpoint."""
-    if not id_token:
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
+
+def verify_google_id_token(credential: str) -> Optional[Dict[str, Any]]:
+    """Verify a Google Sign-In ID token: signature, issuer, expiry, and audience."""
+    if not credential or not GOOGLE_CLIENT_ID:
         return None
-    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={urllib.parse.quote(id_token)}"
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
     try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = google_id_token.verify_oauth2_token(
+            credential, google_requests.Request(), audience=GOOGLE_CLIENT_ID
+        )
         if data.get("email_verified") not in (True, "true"):
             return None
         return {
@@ -95,5 +104,6 @@ def verify_google_id_token(id_token: str) -> Optional[Dict[str, Any]]:
             "picture": data.get("picture", ""),
             "sub": data.get("sub", ""),
         }
-    except (urllib.error.URLError, json.JSONDecodeError, KeyError):
+    except Exception as exc:
+        print(f"⚠️  Google ID token verification failed: {exc}")
         return None

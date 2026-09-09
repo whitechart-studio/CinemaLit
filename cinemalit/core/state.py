@@ -51,7 +51,7 @@ class StateManager:
         with open(self.state_file, "w", encoding="utf-8") as f:
             json.dump(state.to_dict(), f, indent=2)
 
-    def log_audit(self, actor: str, action: str, details: Dict[str, Any]) -> AuditLogEntry:
+    def log_audit(self, actor: str, action: str, details: Dict[str, Any], state: Optional[ProjectState] = None) -> AuditLogEntry:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         entry_id = f"audit-{uuid.uuid4().hex[:6]}"
         entry = AuditLogEntry(
@@ -61,13 +61,16 @@ class StateManager:
             action=action,
             details=details
         )
-        
-        # Append to state if loaded
-        if self.is_initialized():
+
+        if state is not None:
+            # Caller already holds the in-memory state and will save it themselves —
+            # append here so the entry isn't lost when they do.
+            state.audit_logs.append(entry)
+        elif self.is_initialized():
             try:
-                state = self.load_state()
-                state.audit_logs.append(entry)
-                self.save_state(state)
+                loaded = self.load_state()
+                loaded.audit_logs.append(entry)
+                self.save_state(loaded)
             except Exception:
                 pass
 

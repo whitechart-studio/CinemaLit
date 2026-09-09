@@ -1,0 +1,15 @@
+# Install into the SAME venv as the rest of the project (tools.py/crew_tools.py
+# import from web/server.py and cinemalit/, so the project root must be on
+# PYTHONPATH — see README.md).
+#
+# google-adk's [mcp] extra pins the `mcp` SDK to the <2 range ADK 2.x requires.
+# Do NOT `pip install mcp-clickhouse` directly into this venv — it (via fastmcp)
+# pulls in `mcp>=2`, which conflicts with google-adk.
+google-adk[mcp]>=2.8.0
+
+# NOTE: mcp_tools.py connects to ClickHouse Cloud's own hosted, remote MCP
+# server (https://mcp.clickhouse.cloud/mcp) over Streamable HTTP — no local
+# subprocess, no `uv`/`uvx` needed for that. `uv` was needed for an earlier
+# self-hosted-mcp-clickhouse-via-uvx approach, kept installed but unused by
+# the current wiring; safe to remove if you never fall back to that approach.
+uv>=0.12.0

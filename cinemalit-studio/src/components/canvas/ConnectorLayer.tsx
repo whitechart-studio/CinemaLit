@@ -1,8 +1,6 @@
 // src/components/canvas/ConnectorLayer.tsx
 import { useStudioStore } from '../../store/studio';
-
-const NODE_W = 220;
-const NODE_H = 148;
+import { NODE_W, NODE_H } from '../../constants/canvas';
 
 export function ConnectorLayer() {
   const { scenes, connections, selectedSceneId } = useStudioStore();
@@ -17,7 +15,7 @@ export function ConnectorLayer() {
     >
       <defs>
         <marker id="ah-gold" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-          <polygon points="0 0,8 3,0 6" fill="#F59E0B" opacity=".85" />
+          <polygon points="0 0,8 3,0 6" fill="#CBF83E" opacity=".85" />
         </marker>
         <marker id="ah-def" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
           <polygon points="0 0,8 3,0 6" fill="rgba(255,255,255,.18)" />
@@ -42,7 +40,7 @@ export function ConnectorLayer() {
           <path
             key={conn.id}
             d={d}
-            stroke={isSelected ? '#F59E0B' : 'rgba(255,255,255,.16)'}
+            stroke={isSelected ? '#CBF83E' : 'rgba(255,255,255,.16)'}
             strokeWidth={isSelected ? 2.5 : 1.5}
             fill="none"
             markerEnd={isSelected ? 'url(#ah-gold)' : 'url(#ah-def)'}

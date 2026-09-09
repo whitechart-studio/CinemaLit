@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS cinemalit.storyboards (
     end_sec Int32,
     prompt String,
     img_url String,
+    is_placeholder UInt8 DEFAULT 0,
     created_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
 ORDER BY (project_id, scene_num, frame_num)

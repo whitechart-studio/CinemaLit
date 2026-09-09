@@ -32,3 +32,6 @@
   gap: 10px;
   align-items: center;
 }
+
+.cyanText { color: var(--cyan); }
+.accentText { color: var(--accent); }

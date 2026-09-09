@@ -1,0 +1,11 @@
+.venv
+node_modules
+cinemalit-studio/node_modules
+cinemalit-studio/dist
+__pycache__
+*.pyc
+.git
+.env
+**/.env
+**/.env.local
+*.log

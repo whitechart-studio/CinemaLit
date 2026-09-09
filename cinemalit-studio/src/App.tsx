@@ -1,7 +1,13 @@
 // src/App.tsx
+import { useEffect } from 'react';
+import { Agentation } from 'agentation';
+import { Toaster } from './components/ui/sonner';
 import { useStudioStore } from './store/studio';
+import { apiFetch } from './utils/api';
 import { useKeyboard } from './hooks/useKeyboard';
+import { JobBanner } from './components/layout/JobBanner';
 import { HomePage } from './components/home/HomePage';
+import { LandingPage } from './components/screens/LandingPage';
 import { LoginScreen } from './components/screens/LoginScreen';
 import { NewProjectWizard } from './components/wizard/NewProjectWizard';
 
@@ -19,33 +25,49 @@ import { StripboardView } from './components/views/StripboardView';
 import { ShotListView } from './components/views/ShotListView';
 import { BudgetView } from './components/views/BudgetView';
 import { CallSheetView } from './components/views/CallSheetView';
-import { SqlView } from './components/views/SqlView';
 import { StoryboardView } from './components/views/StoryboardView';
 
 export default function App() {
-  const { currentScreen, activeView, user } = useStudioStore();
+  const { currentScreen, activeView, user, token, setAuth, refreshProjects } = useStudioStore();
   useKeyboard();
 
-  const handleExport = () => {
-    window.open('/greenlight_package.html', '_blank');
-  };
+  // A user restored from localStorage may hold a stale/expired/revoked token.
+  // Confirm it against the server on load — apiFetch clears the session on 401.
+  useEffect(() => {
+    if (user && token) {
+      void apiFetch('/api/auth/me').then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'ok') setAuth(data.user, token);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Projects live in ClickHouse now, not localStorage — pull them once signed in.
+  useEffect(() => {
+    if (user) void refreshProjects();
+  }, [user, refreshProjects]);
 
   return (
     <>
-      {!user || currentScreen === 'login' ? (
+      {!user && currentScreen === 'landing' ? (
+        <LandingPage />
+      ) : !user || currentScreen === 'login' ? (
         <LoginScreen />
       ) : currentScreen === 'home' ? (
         <HomePage />
       ) : (
         <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <TopBar onExport={handleExport} />
+          <TopBar />
 
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            {/* DEDICATED AI DIRECTOR AGENT CHAT PANEL ON THE LEFT */}
             <LeftRail />
 
             <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
               <WorkspaceHeader />
+              <JobBanner />
 
               <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
                 {activeView === 'canvas'     && <SceneCanvas />}
@@ -56,13 +78,11 @@ export default function App() {
                 {activeView === 'shotlist'   && <ShotListView />}
                 {activeView === 'budget'     && <BudgetView />}
                 {activeView === 'callsheet'  && <CallSheetView />}
-                {activeView === 'sql'        && <SqlView />}
               </div>
 
               <StatusBar />
             </main>
 
-            {/* PROJECT EXPLORER & INSPECTOR PANEL ON THE RIGHT */}
             <InspectorPanel />
           </div>
         </div>
@@ -70,6 +90,10 @@ export default function App() {
 
       {/* Project Initiation Wizard Modal */}
       <NewProjectWizard />
+
+      {/* Dev-only visual feedback overlay for AI coding agents — never ships to prod */}
+      {import.meta.env.DEV && <Agentation />}
+      <Toaster position="bottom-right" />
     </>
   );
 }

@@ -4,42 +4,181 @@
   background: var(--bg); height: 100%; overflow: hidden;
 }
 
-.header {
-  height: 48px; background: var(--bg-panel);
+/* TOP BAR — title, add-day, and the timeline scrubber share one row now
+   (was two stacked rows) so the schedule grid below gets more height. */
+.topBar {
+  min-height: 52px; background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 16px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 16px;
+  padding: 8px 16px; flex-shrink: 0;
 }
 
-.title { font-size: .88rem; font-weight: 800; color: var(--t1); }
+.topBarLeft { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.title { font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; color: var(--t1); white-space: nowrap; }
 
 .addDayBtn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 5px 10px;
-  background: var(--gold-d);
-  color: var(--gold);
-  border: 1px solid rgba(245,158,11,0.3);
+  background: var(--accent-muted);
+  color: var(--accent);
+  border: 1px solid rgba(203,248,62,0.3);
   border-radius: 6px;
   font-size: .74rem;
   font-weight: 700;
   margin-left: 8px;
+  white-space: nowrap;
   transition: all .14s;
 }
-.addDayBtn:hover { background: var(--gold); color: #000; }
+.addDayBtn:hover { background: var(--accent); color: #000; }
 
-.legend { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: .72rem; color: var(--t3); }
-.legItem { display: flex; align-items: center; gap: 4px; }
+/* Scene-type color key — moved off the main bar into a hover tooltip. */
+.legendBtn {
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t3); border: 1px solid var(--border); transition: all .14s;
+}
+.legendBtn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-muted); }
+
+.legend { display: flex; flex-direction: column; gap: 6px; font-size: .72rem; color: var(--t2); }
+.legItem { display: flex; align-items: center; gap: 6px; }
 .legSquare { width: 10px; height: 10px; border-radius: 2px; }
 
-.body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+/* DAY TIMELINE — a scrubber, not a list of cards, so it stays usable whether
+   the shoot is 2 days or 120. */
+.timelineGroup {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.timelineArrow {
+  width: 26px; height: 26px; border-radius: 5px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t2); transition: all .14s;
+}
+.timelineArrow:hover { background: var(--bg-hover); color: var(--t1); }
+.timelineArrow:disabled { opacity: .35; cursor: default; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+/* PRICE-RANGE STYLE SCRUBBER — one native <input type=range>, styled, plus
+   a floating value badge and tick labels. No slider dependency needed. */
+.sliderWrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  padding-top: 22px;
+  padding-bottom: 14px;
+}
 
-.dayCol {
+.sliderBadge {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #000;
+  font-size: .64rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  transition: left .12s ease-out;
+  pointer-events: none;
+}
+.sliderBadge::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 6px; height: 6px;
+  background: var(--accent);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  transition: background .1s;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: grab;
+  transition: transform .12s;
+}
+.slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); }
+.slider::-moz-range-thumb {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: grab;
+}
+
+.sliderTicks { position: relative; height: 12px; margin-top: 4px; }
+.sliderTick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: .6rem;
+  font-weight: 700;
+  color: var(--t3);
+  white-space: nowrap;
+}
+
+/* TABS */
+.tabsRoot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tabsList {
+  display: flex; width: fit-content; gap: 2px; margin: 12px 16px 0;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px; flex-shrink: 0;
+}
+.tabBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 6px;
+  font-size: .74rem; font-weight: 700; color: var(--t3);
+  transition: all .14s;
+}
+.tabBtn:hover { color: var(--t1); }
+.tabBtn[data-state='active'] {
+  background: var(--bg-panel); color: var(--accent); font-weight: 800;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.tabBody {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 16px; display: flex; flex-direction: column; gap: 14px;
+}
+
+/* GRID — day cards fill the row (auto-fit) instead of one full-width column
+   each. Grid's default row-stretch means every card in a row matches the
+   tallest one automatically, no manual height math needed. */
+.scheduleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-items: stretch;
+  gap: 14px;
+}
+
+.dayPanel {
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  animation: dayIn .22s ease-out both;
+}
+
+@keyframes dayIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .dayHdr {
@@ -47,7 +186,7 @@
   padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: .8rem;
 }
 .daySub { font-size: .67rem; color: var(--t3); margin-top: 1px; }
-.dayPages { font-size: .72rem; font-weight: 800; color: var(--gold); background: var(--gold-d); padding: 2px 7px; border-radius: 4px; }
+.dayPages { font-size: .72rem; font-weight: 800; color: var(--accent); background: var(--accent-muted); padding: 2px 7px; border-radius: 4px; }
 
 .strip {
   border-radius: 7px; padding: 8px 10px; cursor: pointer;
@@ -58,7 +197,7 @@
 
 .sSin { background: rgba(26,26,46,.9); border-left-color: #4ADE80; }
 .sSen { background: rgba(14,24,41,.9); border-left-color: #60A5FA; }
-.sSed { background: rgba(46,42,16,.9); border-left-color: #F59E0B; }
+.sSed { background: rgba(46,42,16,.9); border-left-color: #F0A030; }
 .sSid { background: rgba(28,28,14,.9); border-left-color: #E5D87A; }
 
 .stripTop {
@@ -82,7 +221,7 @@
   color: var(--t2);
   transition: all .14s;
 }
-.moveDayBtn:hover { background: var(--gold-d); color: var(--gold); border-color: var(--gold); }
+.moveDayBtn:hover { background: var(--accent-muted); color: var(--accent); border-color: var(--accent); }
 
 .stripLoc { font-size: .78rem; font-weight: 700; color: var(--t1); }
 .stripMeta { display: flex; align-items: center; gap: 5px; font-size: .67rem; color: var(--t3); }
@@ -100,11 +239,63 @@
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: 10px; padding: 14px;
 }
-.doodLbl { font-size: .74rem; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+.doodTopRow {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 10px;
+}
+.doodLbl { font-size: .74rem; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: .06em; }
 
-.doodTbl { width: 100%; border-collapse: collapse; font-size: .76rem; text-align: center; }
-.doodTbl th, .doodTbl td { padding: 7px 10px; border: 1px solid var(--border); }
+.castToggle {
+  display: inline-flex; gap: 2px; flex-shrink: 0;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 7px; padding: 2px;
+}
+.castToggleBtn {
+  padding: 4px 10px; border-radius: 5px;
+  font-size: .68rem; font-weight: 700; color: var(--t3);
+  white-space: nowrap; transition: all .14s;
+}
+.castToggleBtn:hover { color: var(--t1); }
+.castToggleBtn[data-state='on'] {
+  background: var(--accent-muted); color: var(--accent); font-weight: 800;
+}
+
+/* SCROLLABLE MATRIX — sticky name column + horizontal scroll for the day
+   columns, with prev/next arrows and Left/Right keyboard support (focus the
+   scroll area, same as the timeline's own arrow buttons). */
+.doodScrollOuter {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.doodScrollInner {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  outline: none;
+  border-radius: 8px;
+}
+.doodScrollInner:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+
+.doodArrow {
+  width: 26px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t2); border: 1px solid var(--border); transition: all .14s;
+}
+.doodArrow:hover { background: var(--bg-hover); color: var(--t1); }
+
+.doodTbl { width: max-content; min-width: 100%; border-collapse: collapse; font-size: .76rem; text-align: center; }
+.doodTbl th, .doodTbl td { padding: 7px 10px; border: 1px solid var(--border); min-width: 62px; }
 .doodTbl th { background: var(--bg-elev); color: var(--t3); font-weight: 700; font-size: .66rem; text-transform: uppercase; }
+
+.doodNameCell {
+  text-align: left; color: var(--t1); font-weight: 700;
+  position: sticky; left: 0; min-width: 150px; background: var(--bg-panel); z-index: 1;
+}
+.doodNameHead { background: var(--bg-elev); z-index: 2; }
+.doodDayHead { white-space: nowrap; }
+.doodEmpty { text-align: center; color: var(--t3); font-style: italic; }
 
 .doodCell {
   cursor: pointer;
@@ -116,5 +307,6 @@
 
 .dSw { background: rgba(74,222,128,.15); color: #4ADE80; font-weight: 800; }
 .dW  { background: rgba(96,165,250,.15); color: #60A5FA; font-weight: 800; }
-.dH  { background: rgba(245,158,11,.15); color: #F59E0B; font-weight: 800; }
+.dH  { background: rgba(240,160,48,.15); color: #F0A030; font-weight: 800; }
 .dWf { background: rgba(239,68,68,.15);  color: #EF4444; font-weight: 800; }
+.dBlank { color: var(--t3); font-weight: 400; opacity: .5; }

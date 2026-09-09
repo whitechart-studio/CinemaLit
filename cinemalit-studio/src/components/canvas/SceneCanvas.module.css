@@ -26,6 +26,8 @@
   background-size: 24px 24px;
 }
 
+/* CANVAS_W/CANVAS_H in src/constants/canvas.ts must match width/height below
+   — CSS Modules can't import the TS constant, keep in sync by hand. */
 .board {
   position: absolute;
   top: 0;
@@ -58,6 +60,6 @@
   border: 1px solid var(--border-hi);
   border-radius: 3px;
   font-family: var(--mono);
-  color: var(--gold);
+  color: var(--accent);
   background: var(--bg-elev);
 }

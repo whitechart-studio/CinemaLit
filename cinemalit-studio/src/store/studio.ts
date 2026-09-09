@@ -2,10 +2,12 @@
 import { create } from 'zustand';
 import type {
   Scene, Connection, CanvasTool, ViewId, InspectorTab, AgentMessage,
-  ScreenId, Project, NewProjectForm, AuthUser,
+  ScreenId, HomeSection, Project, NewProjectForm, AuthUser, JobStatus, StudioSettings,
 } from '../types';
 import { initialScenes, initialConnections } from '../data/sampleData';
-import { saveStateToStorage, loadStateFromStorage } from '../utils/storage';
+import { saveStateToStorage, loadStateFromStorage, saveSettings, loadSettings } from '../utils/storage';
+import { apiFetch } from '../utils/api';
+import { parseFountainScript } from '../utils/fountainParser';
 
 const SAMPLE_PROJECTS: Project[] = [
   {
@@ -60,10 +62,28 @@ interface StudioState {
   token: string | null;
   setAuth: (user: AuthUser | null, token: string | null) => void;
   logout: () => void;
+  updateProfile: (name: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 
   // Navigation / Screen Router
   currentScreen: ScreenId;
   setScreen: (screen: ScreenId) => void;
+  authTab: 'login' | 'register';
+  setAuthTab: (tab: 'login' | 'register') => void;
+
+  // Director AI chat rail — toggleable the same way the Inspector is.
+  chatOpen: boolean;
+  setChatOpen: (open: boolean) => void;
+
+  // Which HomePage section is active — lifted to the store so TopBar's
+  // Settings icon (and anything else) can deep-link into a section instead
+  // of HomePage owning it as unreachable local state.
+  homeSection: HomeSection;
+  setHomeSection: (section: HomeSection) => void;
+
+  // Studio-wide settings (HomePage's Settings section)
+  settings: StudioSettings;
+  updateSettings: (patch: Partial<StudioSettings>) => void;
 
   // Wizard
   wizardOpen: boolean;
@@ -74,7 +94,14 @@ interface StudioState {
   projects: Project[];
   activeProject: Project;
   setActiveProject: (p: Project) => void;
-  createProject: (form: NewProjectForm) => void;
+  createProject: (form: NewProjectForm) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+  refreshProjects: () => Promise<void>;
+  loadProjectScenes: (projectId: string) => Promise<void>;
+
+  // Agent ingest progress
+  job: JobStatus | null;
+  setJob: (job: JobStatus | null) => void;
 
   // View routing
   activeView: ViewId;
@@ -119,6 +146,9 @@ interface StudioState {
   inspectorTab: InspectorTab;
   openInspector: (sceneId: string) => void;
   closeInspector: () => void;
+  /** Show/hide the panel without forcing a scene selection — for the
+   *  WorkspaceHeader toggle, as opposed to clicking a scene node. */
+  setInspectorOpen: (open: boolean) => void;
   setInspectorTab: (tab: InspectorTab) => void;
 
   // Agent messages
@@ -127,6 +157,53 @@ interface StudioState {
 }
 
 let connIdCounter = 10;
+
+/** Pull dialogue out of a scene's stored screenplay text, so scenes loaded from
+ *  ClickHouse read the same as freshly imported ones. */
+function parseSceneDialogue(sceneText: string) {
+  const { scenes } = parseFountainScript(sceneText);
+  return scenes[0]?.dialogue ?? [];
+}
+
+/**
+ * Poll an agent job until it settles, refreshing the canvas as scenes land.
+ *
+ * The ingest runs on the server for as long as the script is long, so the
+ * browser polls instead of holding a request open — a refresh mid-ingest picks
+ * the progress right back up.
+ */
+async function pollJob(projectId: string, kind: 'ingest' | 'storyboard', thenStoryboards = false) {
+  const store = useStudioStore;
+  const deadline = Date.now() + 30 * 60 * 1000;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2000));
+    let job: JobStatus | null = null;
+    try {
+      const data = await (await apiFetch(`/api/jobs?projectId=${projectId}&kind=${kind}`)).json();
+      if (data.status === 'ok') job = data.job as JobStatus;
+    } catch {
+      continue; // transient — keep polling rather than killing the run
+    }
+    if (!job) continue;
+
+    store.setState({ job });
+    if (job.done > 0) await store.getState().loadProjectScenes(projectId);
+
+    if (job.status === 'done' || job.status === 'partial' || job.status === 'error') {
+      await store.getState().loadProjectScenes(projectId);
+      await store.getState().refreshProjects();
+      if (kind === 'ingest' && thenStoryboards) {
+        store.setState({ job: { ...job, status: 'running', done: 0, message: 'Generating storyboards…' } });
+        void pollJob(projectId, 'storyboard');
+        return;
+      }
+      setTimeout(() => store.setState({ job: null }), 4000);
+      return;
+    }
+  }
+  store.setState({ job: null });
+}
 
 export const useStudioStore = create<StudioState>((set) => ({
   user: (() => {
@@ -154,46 +231,174 @@ export const useStudioStore = create<StudioState>((set) => ({
     set({ user: null, token: null });
   },
 
-  currentScreen: 'home',
+  updateProfile: async (name) => {
+    const resp = await apiFetch('/api/auth/update-profile', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not update profile');
+    useStudioStore.getState().setAuth(data.user, data.token);
+  },
+
+  deleteAccount: async () => {
+    const resp = await apiFetch('/api/auth/delete-account', { method: 'POST' });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not delete account');
+    useStudioStore.getState().logout();
+    set({ currentScreen: 'login' });
+  },
+
+  currentScreen: 'landing',
   setScreen: (screen) => set({ currentScreen: screen }),
+  authTab: 'login',
+  setAuthTab: (tab) => set({ authTab: tab }),
+
+  chatOpen: true,
+  setChatOpen: (open) => set({ chatOpen: open }),
+
+  homeSection: 'hub',
+  setHomeSection: (section) => set({ homeSection: section }),
+
+  settings: loadSettings() || {
+    studioName: 'CinemaLit Pictures',
+    unionScale: 'SAG-AFTRA Ultra Low Budget',
+    exportFormat: 'Greenlight Package (HTML/PDF)',
+  },
+  updateSettings: (patch) =>
+    set((s) => {
+      const next = { ...s.settings, ...patch };
+      saveSettings(next);
+      return { settings: next };
+    }),
 
   wizardOpen: false,
   openWizard: () => set({ wizardOpen: true }),
   closeWizard: () => set({ wizardOpen: false }),
 
-  projects: saved?.projects || SAMPLE_PROJECTS,
-  activeProject: (saved?.projects && saved.projects[0]) || SAMPLE_PROJECTS[0],
-  setActiveProject: (p) => set({ activeProject: p, currentScreen: 'workbench' }),
+  // `saved?.x || fallback` would wrongly replace a legitimately-empty saved
+  // array (e.g. a freshly created project with 0 scenes) with demo data,
+  // since `[]` is truthy — only fall back when nothing was saved at all.
+  projects: saved ? saved.projects ?? SAMPLE_PROJECTS : SAMPLE_PROJECTS,
+  activeProject: saved?.projects?.[0] ?? SAMPLE_PROJECTS[0],
+  setActiveProject: (p) => {
+    set({ activeProject: p, currentScreen: 'workbench' });
+    void useStudioStore.getState().loadProjectScenes(p.id);
+  },
 
-  createProject: (form) =>
-    set((s) => {
-      const newProj: Project = {
-        id: `p${Date.now()}`,
-        name: form.name || 'Untitled Production',
-        phase: 'Pre-Production',
+  job: null,
+  setJob: (job) => set({ job }),
+
+  /** Creates the project server-side and hands the script to the Director
+   *  Agent. The agent's ingest runs in the background; we poll for progress
+   *  and pull the scenes it writes as they land. */
+  createProject: async (form) => {
+    const resp = await apiFetch('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: form.name,
         format: form.format,
-        genre: form.genre || 'Drama',
-        scenesCount: 3,
-        budgetCap: form.budgetCap || 5000,
-        estimatedCost: Math.round((form.budgetCap || 5000) * 0.95),
-        shootDays: form.shootDays || 2,
-        scriptFile: form.scriptFile || `${form.name.toLowerCase().replace(/\s+/g, '_')}.fountain`,
-        updatedAt: 'Just now',
-        status: 'active',
-      };
-      const updatedProjects = [newProj, ...s.projects];
-      saveStateToStorage({ scenes: s.scenes, connections: s.connections, projects: updatedProjects });
-      return {
-        projects: updatedProjects,
-        activeProject: newProj,
-        wizardOpen: false,
-        currentScreen: 'workbench',
-        activeView: 'canvas',
-      };
-    }),
+        genre: form.genre,
+        budgetCap: form.budgetCap,
+        shootDays: form.shootDays,
+        unionScale: form.unionScale,
+        selectedAgents: form.selectedAgents,
+        scriptFile: form.scriptFile,
+        scriptText: form.scriptText,
+        generateStoryboards: form.generateStoryboards,
+      }),
+    });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not create the project');
+
+    const proj: Project = {
+      id: data.projectId,
+      name: form.name || 'Untitled Production',
+      phase: 'Development',
+      format: form.format,
+      genre: form.genre || 'Drama',
+      scenesCount: 0,
+      budgetCap: form.budgetCap || 5000,
+      estimatedCost: 0,
+      shootDays: form.shootDays || 2,
+      scriptFile: form.scriptFile,
+      updatedAt: 'Just now',
+      status: 'development',
+    };
+    set((s) => ({
+      projects: [proj, ...s.projects],
+      activeProject: proj,
+      scenes: [],
+      connections: [],
+      wizardOpen: false,
+      currentScreen: 'workbench',
+      activeView: 'canvas',
+      job: { status: 'pending', total: 0, done: 0, message: 'Handing the script to the Director Agent…' },
+    }));
+
+    void pollJob(data.projectId, 'ingest', form.generateStoryboards);
+  },
+
+  deleteProject: async (projectId) => {
+    const resp = await apiFetch('/api/projects/delete', {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not delete the project');
+    set((s) => ({ projects: s.projects.filter((p) => p.id !== projectId) }));
+  },
+
+  refreshProjects: async () => {
+    try {
+      const data = await (await apiFetch('/api/projects')).json();
+      if (data.status !== 'ok' || !Array.isArray(data.projects)) return;
+      set({ projects: data.projects });
+    } catch {
+      /* offline — keep whatever is already in the store */
+    }
+  },
+
+  /** Pull a project's scenes out of ClickHouse and onto the canvas. */
+  loadProjectScenes: async (projectId) => {
+    try {
+      const data = await (await apiFetch(`/api/clickhouse/scenes?projectId=${projectId}`)).json();
+      if (data.status !== 'ok' || !Array.isArray(data.scenes)) return;
+      const scenes: Scene[] = data.scenes.map((sc: any, i: number) => ({
+        // sc.sceneNum is a display-only, lossy last-2-digits truncation (see
+        // server.py's `short`) — scene 007, 107, 207 all render "07" and would
+        // collide here. sc.sceneNumber is the full original ("SC-007"), the
+        // only field actually unique per project.
+        id: `sn-${projectId}-${sc.sceneNumber}`,
+        num: String(sc.sceneNum).padStart(2, '0'),
+        slug: sc.slugline,
+        type: String(sc.slugline).startsWith('EXT') ? 'EXT' : 'INT',
+        timing: (['DAY', 'NIGHT', 'DAWN', 'DUSK'].find((t) => String(sc.slugline).includes(t)) || 'DAY'),
+        loc: String(sc.slugline).replace(/^(INT|EXT)\.\s*/, '').split('—')[0].trim(),
+        pages: String((sc.pageCount ?? (sc.totalDurationSec || 60) / 60).toFixed(2)),
+        cast: sc.cast || [],
+        shots: sc.shotCount ?? (sc.frames || []).length,
+        risk: sc.risk || 'low',
+        riskNote: sc.riskNote || 'No risk flags',
+        day: sc.shootDay || 1,
+        desc: sc.desc || '',
+        props: sc.props || [],
+        ward: sc.ward || [],
+        vfx: sc.vfx || [],
+        sfx: sc.sfx || [],
+        body: sc.sceneText || '',
+        dialogue: parseSceneDialogue(sc.sceneText || ''),
+        x: 100 + (i % 4) * 290,
+        y: 160 + Math.floor(i / 4) * 220,
+      })) as Scene[];
+      set({ scenes });
+    } catch {
+      /* offline — leave the canvas as-is rather than blanking it */
+    }
+  },
 
   activeView: 'canvas',
-  openTabs: ['canvas', 'script', 'storyboard', 'breakdown', 'stripboard', 'shotlist', 'budget', 'callsheet', 'sql'],
+  openTabs: ['canvas', 'script', 'storyboard', 'breakdown', 'stripboard', 'shotlist', 'budget', 'callsheet'],
   setActiveView: (v) =>
     set((s) => ({
       activeView: v,
@@ -207,7 +412,7 @@ export const useStudioStore = create<StudioState>((set) => ({
       return { openTabs: remaining, activeView: nextActive };
     }),
 
-  scenes: saved?.scenes || initialScenes,
+  scenes: saved ? saved.scenes ?? initialScenes : initialScenes,
   setScenes: (scenes) =>
     set((s) => {
       saveStateToStorage({ scenes, connections: s.connections, projects: s.projects });
@@ -263,7 +468,7 @@ export const useStudioStore = create<StudioState>((set) => ({
       return { scenes: rearranged, panX: 60, panY: 60, zoom: 1 };
     }),
 
-  connections: saved?.connections || initialConnections,
+  connections: saved ? saved.connections ?? initialConnections : initialConnections,
   addConnection: (conn) =>
     set((s) => {
       const next = [...s.connections, conn];
@@ -298,6 +503,7 @@ export const useStudioStore = create<StudioState>((set) => ({
     set({ inspectorOpen: true, selectedSceneId: sceneId }),
   closeInspector: () =>
     set({ inspectorOpen: false, selectedSceneId: null }),
+  setInspectorOpen: (open) => set({ inspectorOpen: open }),
   setInspectorTab: (tab) => set({ inspectorTab: tab }),
 
   agentMessages: [
@@ -311,6 +517,14 @@ export const useStudioStore = create<StudioState>((set) => ({
   addAgentMessage: (msg) =>
     set((s) => ({ agentMessages: [...s.agentMessages, msg] })),
 }));
+
+/** Show the progress banner and follow an ingest the agent is already running. */
+export function watchIngest(projectId: string) {
+  useStudioStore.setState({
+    job: { status: 'pending', total: 0, done: 0, message: 'Director Agent is re-reading the script…' },
+  });
+  void pollJob(projectId, 'ingest');
+}
 
 // Helper to generate a new scene
 export function makeNewScene(scenes: Scene[]): Scene {

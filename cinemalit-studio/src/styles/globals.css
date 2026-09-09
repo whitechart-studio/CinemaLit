@@ -1,5 +1,37 @@
 /* src/styles/globals.css */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* shadcn/ui components are styled with Tailwind utility classes that read
+   these semantic tokens (bg-background, text-foreground, bg-primary, etc).
+   Mapped straight onto the CSS custom properties below — one palette, not
+   two. This app is dark-only by design, so there's no separate `.dark`
+   override block the way a light/dark-toggle shadcn project would have. */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--t1);
+  --color-card: var(--bg-panel);
+  --color-card-foreground: var(--t1);
+  --color-popover: var(--bg-elev);
+  --color-popover-foreground: var(--t1);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--bg-active);
+  --color-secondary-foreground: var(--t1);
+  --color-muted: var(--bg-hover);
+  --color-muted-foreground: var(--t2);
+  --color-accent: var(--accent-muted);
+  --color-accent-foreground: var(--t1);
+  --color-destructive: var(--red);
+  --color-destructive-foreground: var(--t1);
+  --color-border: var(--border);
+  --color-input: var(--border-hi);
+  --color-ring: var(--accent-border);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
 
 :root {
   --bg:        #09090E;
@@ -12,8 +44,16 @@
   --t1: #F0F0F5;
   --t2: #8A8A9E;
   --t3: #52526A;
-  --gold:   #F59E0B;
-  --gold-d: rgba(245,158,11,0.14);
+  /* Brand accent — the ONE interactive/brand signal color (buttons, active
+     state, focus rings, links). Was scattered inconsistently as --gold
+     before; now a single deliberate token. See DESIGN.md. */
+  --accent:        #CBF83E;
+  --accent-dim:    #A8D62F; /* hover/pressed */
+  --accent-muted:  rgba(203,248,62,0.14); /* subtle bg tint */
+  --accent-border: rgba(203,248,62,0.4);  /* focus ring / active border */
+  --on-accent:     #0A0A0A; /* text/icon sitting on a solid --accent fill */
+  /* Semantic/categorical colors — real informational meaning (risk level,
+     element category, status), not decoration. Left as-is. */
   --cyan:   #06B6D4;
   --cyan-d: rgba(6,182,212,0.14);
   --red:    #EF4444;
@@ -22,10 +62,10 @@
   --grn-d:  rgba(34,197,94,0.14);
   --pur:    #A855F7;
   --pur-d:  rgba(168,85,247,0.14);
-  /* Industry strip colours */
+  /* Industry strip colours (scene-type convention: INT/EXT x DAY/NIGHT) */
   --sin: #1A1A2E; --sin-a: #4ADE80;
   --sen: #0E1829; --sen-a: #60A5FA;
-  --sed: #2E2A10; --sed-a: #F59E0B;
+  --sed: #2E2A10; --sed-a: #F0A030;
   --sid: #1C1C0E; --sid-a: #E5D87A;
   --font: 'Inter', -apple-system, sans-serif;
   --mono: 'JetBrains Mono', monospace;
@@ -33,22 +73,39 @@
   --top:  48px;
   --ins:  360px;
   --bar:  28px;
+  /* Shared z-index scale — replaces independently-hardcoded magic values
+     (20/50/100/999/9999/10000) found across module CSS files */
+  --z-dropdown: 30;
+  --z-sticky:   50;
+  --z-overlay:  100;
+  --z-modal:    1000;
+  --z-popover:  1050;
+  --z-toast:    1100;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Tailwind v4's `@import "tailwindcss"` puts utility classes (px-3, border,
+   bg-transparent, etc) inside its own cascade layers. An unlayered rule beats
+   every layered rule regardless of specificity, so this reset — written
+   plain, not `@layer`d — was silently zeroing the padding/border/background
+   that shadcn's Select/Input/Button set via Tailwind classes on every button,
+   input and textarea site-wide. Wrapping it in `@layer base` puts it back
+   under Tailwind's own base layer, where utilities still win as expected. */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body, #root {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--t1);
-  -webkit-font-smoothing: antialiased;
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--t1);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font-family: var(--font); cursor: pointer; border: none; background: none; }
+  textarea, input { font-family: var(--font); }
 }
-
-button { font-family: var(--font); cursor: pointer; border: none; background: none; }
-textarea, input { font-family: var(--font); }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-active); border-radius: 2px; }

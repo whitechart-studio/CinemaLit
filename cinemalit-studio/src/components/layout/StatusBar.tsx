@@ -23,7 +23,7 @@ export function StatusBar() {
   return (
     <div className={styles.sbar}>
       <div className={styles.si}>
-        <Film size={13} color="var(--gold)" />
+        <Film size={13} color="var(--accent)" />
         <strong>{VIEW_TITLES[activeView] || activeView}</strong>
       </div>
       <span className={styles.ss}>·</span>
@@ -42,11 +42,11 @@ export function StatusBar() {
       <div className={styles.sr}>
         <div className={styles.si}>
           <Database size={13} color="var(--cyan)" />
-          ClickHouse: <strong style={{ color: 'var(--cyan)' }}>3.8ms</strong>
+          <strong className={styles.cyanText}>ClickHouse Connected</strong>
         </div>
         <div className={styles.si}>
-          <Bot size={13} color="var(--gold)" />
-          Agents: <strong style={{ color: 'var(--gold)' }}>Active</strong>
+          <Bot size={13} color="var(--accent)" />
+          <strong className={styles.accentText}>Agent Active</strong>
         </div>
       </div>
     </div>

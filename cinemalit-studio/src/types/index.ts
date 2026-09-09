@@ -12,11 +12,17 @@ export type ViewId =
   | 'shotlist'
   | 'storyboard'
   | 'budget'
-  | 'callsheet'
-  | 'sql';
+  | 'callsheet';
 
-export type InspectorTab = 'info' | 'elems' | 'shots' | 'ai' | 'files' | 'plan';
-export type ScreenId = 'home' | 'workbench' | 'login';
+export type InspectorTab = 'info' | 'elems' | 'shots' | 'files' | 'plan';
+export type ScreenId = 'landing' | 'home' | 'workbench' | 'login';
+export type HomeSection = 'hub' | 'projects' | 'agents' | 'settings' | 'profile';
+
+export interface StudioSettings {
+  studioName: string;
+  unionScale: string;
+  exportFormat: string;
+}
 
 export interface AuthUser {
   id: string;
@@ -53,6 +59,16 @@ export interface NewProjectForm {
   unionScale: string;
   selectedAgents: string[];
   clickhouseEnabled: boolean;
+  generateStoryboards: boolean;
+}
+
+/** Progress of an agent-run background job (script ingest, storyboards). */
+export interface JobStatus {
+  status: 'pending' | 'running' | 'done' | 'partial' | 'error';
+  total: number;
+  done: number;
+  message: string;
+  error?: string;
 }
 
 export interface Scene {
@@ -74,9 +90,20 @@ export interface Scene {
   ward: string[];
   vfx: string[];
   sfx: string[];
+  /** Raw screenplay text for this scene, when we have it. Kept so exporting a
+   *  script round-trips instead of regenerating placeholder prose. */
+  body?: string;
+  /** Dialogue captured per character, in script order. */
+  dialogue?: DialogueLine[];
   // Canvas position
   x: number;
   y: number;
+}
+
+export interface DialogueLine {
+  character: string;
+  parenthetical?: string;
+  text: string;
 }
 
 export interface Connection {
@@ -108,6 +135,7 @@ export interface BudgetItem {
   cap: number;
   isCategory?: boolean;
   status?: 'ok' | 'over' | 'pending';
+  sceneNumber?: string | null;
 }
 
 export interface CastCallEntry {
@@ -124,10 +152,5 @@ export interface AgentMessage {
   role: 'user' | 'agent';
   text: string;
   ts: string;
-}
-
-export interface CanvasTransform {
-  panX: number;
-  panY: number;
-  zoom: number;
+  attachmentName?: string;
 }

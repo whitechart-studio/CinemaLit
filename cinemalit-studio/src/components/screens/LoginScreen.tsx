@@ -2,11 +2,14 @@
 import { useState } from 'react';
 import { Clapperboard, LogIn, UserPlus, Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
+import { GoogleSignInButton } from '../auth/GoogleSignInButton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import styles from './LoginScreen.module.css';
 
 export function LoginScreen() {
-  const { setAuth, setScreen } = useStudioStore();
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const { setAuth, setScreen, authTab } = useStudioStore();
+  const [tab, setTab] = useState<'login' | 'register'>(authTab);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -43,18 +46,14 @@ export function LoginScreen() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleCredential = async (credential: string) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'producer.google@cinemalit.studio',
-          name: 'Executive Producer',
-          picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=google_prod',
-        }),
+        body: JSON.stringify({ credential }),
       });
       const data = await res.json();
 
@@ -77,40 +76,43 @@ export function LoginScreen() {
         {/* LEFT PROMO HERO PANEL */}
         <div className={styles.heroPanel}>
           <div className={styles.heroBrand}>
-            <div className={styles.brandMark}><Clapperboard size={22} /></div>
+            <button
+              type="button"
+              className={styles.brandMark}
+              onClick={() => setScreen('landing')}
+              aria-label="Back to home"
+            >
+              <Clapperboard size={22} />
+            </button>
             <span className={styles.brandName}>Cinema<span>Lit</span> Studio</span>
           </div>
 
           <div className={styles.heroContent}>
-            <div className={styles.badge}><Sparkles size={13} color="var(--gold)" /> Agentic Cinema Command Center</div>
+            <div className={styles.badge}><Sparkles size={13} color="var(--accent)" /> Agentic Cinema Command Center</div>
             <h1 className={styles.heroTitle}>AI-Powered Film Pre-Production &amp; Storyboarding</h1>
             <p className={styles.heroSub}>
               Connect your screenplays directly to ClickHouse DB pipelines, generate shot lists, estimate scene pacing, and auto-produce AI storyboards.
             </p>
-          </div>
-
-          <div className={styles.heroFooter}>
-            <span>ClickHouse Track · Agentic Cinema Hackathon</span>
           </div>
         </div>
 
         {/* RIGHT AUTH FORM PANEL */}
         <div className={styles.formPanel}>
           <div className={styles.formCard}>
-            <div className={styles.tabToggle}>
-              <button
-                className={`${styles.tabBtn} ${tab === 'login' ? styles.activeTab : ''}`}
-                onClick={() => { setTab('login'); setError(null); }}
-              >
-                <LogIn size={14} /> Sign In
-              </button>
-              <button
-                className={`${styles.tabBtn} ${tab === 'register' ? styles.activeTab : ''}`}
-                onClick={() => { setTab('register'); setError(null); }}
-              >
-                <UserPlus size={14} /> Register Account
-              </button>
-            </div>
+            <Tabs
+              value={tab}
+              onValueChange={(v) => { setTab(v as 'login' | 'register'); setError(null); }}
+              className={styles.tabToggle}
+            >
+              <TabsList className="h-auto w-full justify-stretch rounded-none bg-transparent p-0">
+                <TabsTrigger value="login" className={`${styles.tabBtn} ${tab === 'login' ? styles.activeTab : ''} flex-1`}>
+                  <LogIn size={14} /> Sign In
+                </TabsTrigger>
+                <TabsTrigger value="register" className={`${styles.tabBtn} ${tab === 'register' ? styles.activeTab : ''} flex-1`}>
+                  <UserPlus size={14} /> Register Account
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
             {error && <div className={styles.errorBox}>{error}</div>}
 
@@ -131,13 +133,18 @@ export function LoginScreen() {
 
                   <div className={styles.field}>
                     <label>Production Role</label>
-                    <select value={role} onChange={(e) => setRole(e.target.value)} className={styles.select}>
-                      <option value="Director">Director</option>
-                      <option value="Executive Producer">Executive Producer</option>
-                      <option value="1st AD / Line Producer">1st AD / Line Producer</option>
-                      <option value="Cinematographer (DP)">Cinematographer (DP)</option>
-                      <option value="VFX Supervisor">VFX Supervisor</option>
-                    </select>
+                    <Select value={role} onValueChange={setRole}>
+                      <SelectTrigger className={`${styles.select} w-full`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Director">Director</SelectItem>
+                        <SelectItem value="Executive Producer">Executive Producer</SelectItem>
+                        <SelectItem value="1st AD / Line Producer">1st AD / Line Producer</SelectItem>
+                        <SelectItem value="Cinematographer (DP)">Cinematographer (DP)</SelectItem>
+                        <SelectItem value="VFX Supervisor">VFX Supervisor</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </>
               )}
@@ -176,15 +183,7 @@ export function LoginScreen() {
               <span>OR CONTINUE WITH</span>
             </div>
 
-            <button className={styles.googleBtn} onClick={handleGoogleLogin} disabled={loading}>
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
-                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
-                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12.5s.7 2.8 1.9 5.2l3.7-2.9z"/>
-                <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/>
-              </svg>
-              <span>Sign in with Google Workspace</span>
-            </button>
+            <GoogleSignInButton onCredential={handleGoogleCredential} />
           </div>
         </div>
       </div>

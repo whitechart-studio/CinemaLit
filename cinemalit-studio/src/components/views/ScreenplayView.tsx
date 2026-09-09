@@ -1,9 +1,11 @@
 // src/components/views/ScreenplayView.tsx
 import { useState, useRef } from 'react';
-import { Edit3, Eye, Upload, Download, Sparkles } from 'lucide-react';
+import { Edit3, Eye, Upload, Download } from 'lucide-react';
+import { toast } from 'sonner';
 import { useStudioStore } from '../../store/studio';
 import { parseFountainScript, exportToFountain } from '../../utils/fountainParser';
-import { apiFetch } from '../../utils/api';
+import { readScriptFile, SCRIPT_ACCEPT } from '../../utils/scriptFile';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import styles from './ScreenplayView.module.css';
 
 const DEFAULT_FOUNTAIN = `Title: Neon Echoes
@@ -71,17 +73,15 @@ export function ScreenplayView() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ''; // so re-picking the same file fires onChange again
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const content = evt.target?.result as string;
-      if (content) {
-        handleTextChange(content);
-      }
-    };
-    reader.readAsText(file);
+    try {
+      handleTextChange(await readScriptFile(file));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read that file.');
+    }
   };
 
   const handleExport = () => {
@@ -132,53 +132,29 @@ export function ScreenplayView() {
       <div className={styles.body}>
         {/* TOP TOOLBAR */}
         <div className={styles.toolbar}>
-          <div className={styles.modeToggle}>
-            <button
-              className={`${styles.modeBtn} ${mode === 'read' ? styles.activeMode : ''}`}
-              onClick={() => setMode('read')}
-            >
+          <ToggleGroup
+            type="single"
+            value={mode}
+            onValueChange={(v) => { if (v) setMode(v as 'read' | 'edit'); }}
+            className={styles.modeToggle}
+          >
+            <ToggleGroupItem value="read" className={styles.modeBtn}>
               <Eye size={13} /> Reader Mode
-            </button>
-            <button
-              className={`${styles.modeBtn} ${mode === 'edit' ? styles.activeMode : ''}`}
-              onClick={() => setMode('edit')}
-            >
+            </ToggleGroupItem>
+            <ToggleGroupItem value="edit" className={styles.modeBtn}>
               <Edit3 size={13} /> Fountain Editor
-            </button>
-          </div>
-
-          <span className={styles.astStatus}>
-            <Sparkles size={13} color="var(--gold)" /> AST Sync: Active ({scenes.length} scenes parsed)
-          </span>
+            </ToggleGroupItem>
+          </ToggleGroup>
 
           <div className={styles.tbActions}>
             <input
               type="file"
               ref={fileInputRef}
               style={{ display: 'none' }}
-              accept=".fountain,.txt,.fdx"
-              onChange={handleFileUpload}
+              accept={SCRIPT_ACCEPT}
+              onChange={(e) => void handleFileUpload(e)}
             />
             <div className={styles.tools}>
-              <button
-                className={styles.toolBtn}
-                style={{ background: 'var(--cyan)', color: '#000', fontWeight: 700 }}
-                onClick={async () => {
-                  try {
-                    const r = await apiFetch('/api/ai/sync-script-to-db', {
-                      method: 'POST',
-                      body: JSON.stringify({ scriptText: fountainText }),
-                    });
-                    const d = await r.json();
-                    alert(`⚡ ${d.message || 'Synced to ClickHouse!'}`);
-                  } catch {
-                    alert('Synced script scenes to ClickHouse DB successfully.');
-                  }
-                }}
-                title="Parse screenplay with Gemini AI and insert parsed scene records into ClickHouse DB"
-              >
-                <Sparkles size={13} /> Sync to ClickHouse
-              </button>
               <button
                 className={styles.toolBtn}
                 onClick={() => fileInputRef.current?.click()}
@@ -207,22 +183,28 @@ export function ScreenplayView() {
             <div className={styles.doc}>
               <div className={styles.titlePage}>
                 <h1>{activeProject.name}</h1>
-                <p>Written by A. Kubrick &amp; J. Villeneuve</p>
-                <p className={styles.sub}>THIRD DRAFT · August 2, 2026 · {scenes.length} Scenes parsed</p>
+                <p className={styles.sub}>{scenes.length} Scenes parsed</p>
               </div>
 
               {scenes.map((sc) => (
-                <div key={sc.id} id={`sp-s${sc.num}`} className={styles.sceneBlock}>
+                <div
+                  key={sc.id}
+                  id={`sp-s${sc.num}`}
+                  className={`${styles.sceneBlock} ${activeSceneId === `s${sc.num}` ? styles.sceneActive : ''}`}
+                >
                   <span className={styles.stag}>SCENE {sc.num}</span>
                   <div className={styles.slug}>{sc.slug}</div>
-                  <p className={styles.action}>{sc.desc || 'Flickering cyan neon tubes illuminate rain-streaked windows.'}</p>
-                  
-                  {sc.cast.map((c, i) => (
+                  <p className={styles.action}>{sc.desc || 'No action description captured for this scene.'}</p>
+
+                  {(sc.dialogue ?? []).map((d, i) => (
                     <div key={i} className={styles.dialogueGroup}>
-                      <div className={styles.cname}>{c.toUpperCase()}</div>
-                      <p className={styles.dialogue}>
-                        {i === 0 ? "You're twelve minutes late. The window closes in eight." : "Traffic was monitored. Had to ghost three blocks."}
-                      </p>
+                      <div className={styles.cname}>{d.character.toUpperCase()}</div>
+                      {d.parenthetical && (
+                        <div className={styles.cname} style={{ opacity: 0.6, fontWeight: 400 }}>
+                          ({d.parenthetical})
+                        </div>
+                      )}
+                      <p className={styles.dialogue}>{d.text}</p>
                     </div>
                   ))}
                 </div>
