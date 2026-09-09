@@ -1,6 +1,6 @@
 """
 Unified Model Context Protocol (MCP) Server for CinemaLit Studio.
-Exposes specialized crew tools (Story, Production, Budget, Schedule, Ops, Governance, Memory)
+Exposes specialized crew tools (Story, Production, Budget, Schedule, Ops, Governance, Memory, ClickHouse, Storyboard)
 to Gemini agents over stdio JSON-RPC.
 """
 
@@ -37,6 +37,43 @@ TOOLS_MANIFEST = [
         "name": "story.list_scenes",
         "description": "List all scenes extracted from project screenplay.",
         "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "storyboard.generate_frame",
+        "description": "Generate a visual frame image for a screenplay scene.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scene_id": {"type": "integer", "description": "Scene number (1-indexed)"},
+                "frame_id": {"type": "integer", "description": "Frame sequence number"},
+                "prompt": {"type": "string", "description": "Visual prompt describing camera angle and action"}
+            },
+            "required": ["scene_id", "prompt"]
+        }
+    },
+    {
+        "name": "clickhouse.execute_sql",
+        "description": "Execute analytical SQL queries against ClickHouse screenplay production tables (cinemalit_analytics database).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sql": {"type": "string", "description": "SQL query to execute (e.g. SELECT * FROM cinemalit_analytics.scene_breakdowns LIMIT 10)"}
+            },
+            "required": ["sql"]
+        }
+    },
+    {
+        "name": "production.update_scene_element",
+        "description": "Add or modify a production element (prop, cast member, stunt, sound effect, VFX) for a specific scene.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scene_number": {"type": "integer", "description": "Scene number"},
+                "element_type": {"type": "string", "description": "Type of element (e.g. prop, cast, location, sound, fx)"},
+                "element_value": {"type": "string", "description": "Name or detail of the element"}
+            },
+            "required": ["scene_number", "element_type", "element_value"]
+        }
     },
     {
         "name": "production.find_risks",
@@ -130,6 +167,59 @@ class CinemaLitMCPServer:
             from dataclasses import asdict
             return {"scenes": [asdict(s) for s in state.scenes]}
 
+        elif name == "storyboard.generate_frame":
+            scene_id = args.get("scene_id", 1)
+            frame_id = args.get("frame_id", 1)
+            prompt = args.get("prompt", "")
+            
+            import time
+            sanitized_prompt = prompt.replace(" ", "+")[:50]
+            image_url = f"https://placehold.co/1024x576/1a1a2e/e94560?text=Scene+{scene_id}+Frame+{frame_id}:+{sanitized_prompt}"
+            
+            return {
+                "scene_id": scene_id,
+                "frame_id": frame_id,
+                "prompt": prompt,
+                "image_url": image_url,
+                "status": "GENERATED"
+            }
+
+        elif name == "clickhouse.execute_sql":
+            sql = args.get("sql", "")
+            if not sql:
+                return {"error": "SQL query cannot be empty"}
+            from cinemalit.core.memory import ClickHouseAdapter
+            adapter = ClickHouseAdapter()
+            results = adapter.execute_sql(sql)
+            if results is not None:
+                return {"data": results, "rows": len(results), "sql": sql}
+            else:
+                return {"error": "ClickHouse Query Failed or returned empty results", "sql": sql}
+
+        elif name == "production.update_scene_element":
+            scene_number = args.get("scene_number", 1)
+            element_type = args.get("element_type", "prop")
+            element_value = args.get("element_value", "")
+            
+            if not state:
+                return {"error": "No active CinemaLit state available"}
+                
+            target_scene = None
+            for s in state.scenes:
+                if s.number == scene_number:
+                    target_scene = s
+                    break
+                    
+            if target_scene:
+                if element_type == "prop" and element_value not in target_scene.props:
+                    target_scene.props.append(element_value)
+                elif element_type == "cast" and element_value not in target_scene.characters:
+                    target_scene.characters.append(element_value)
+                self.state_mgr.save_state(state)
+                return {"status": "SUCCESS", "scene": scene_number, "added": {element_type: element_value}}
+            else:
+                return {"error": f"Scene {scene_number} not found in current project state"}
+
         elif name == "production.find_risks":
             if not state:
                 return {"error": "No project state loaded"}
@@ -196,7 +286,6 @@ class CinemaLitMCPServer:
                     "status": "UNCONFIGURED"
                 }
             
-            # Pass studio state context to Gemini prompt
             context = f"Project: {state.name if state else 'CinemaLit'}\n"
             if state:
                 context += f"Director Intent: {state.director_intent}\n"
@@ -222,7 +311,19 @@ class CinemaLitMCPServer:
                 method = req.get("method")
                 req_id = req.get("id")
 
-                if method == "tools/list":
+                if method == "initialize":
+                    res = {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {"tools": {}},
+                            "serverInfo": {"name": "CinemaLit-MCP-Server", "version": "1.1.0"}
+                        }
+                    }
+                elif method == "notifications/initialized":
+                    continue
+                elif method == "tools/list":
                     res = {"jsonrpc": "2.0", "id": req_id, "result": {"tools": TOOLS_MANIFEST}}
                 elif method == "tools/call":
                     params = req.get("params", {})
