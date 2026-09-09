@@ -1,14 +1,19 @@
 // src/components/home/HomePage.tsx
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
-  Clapperboard, Plus, Film, Sparkles, Database, Layers,
-  CalendarDays, ArrowRight, FolderKanban,
-  Bot, Settings, Search, Play, FileText, Home,
-  DollarSign, Shield, LogOut, LogIn, UserCheck,
+  Clapperboard, Plus, Film, Sparkles, Layers,
+  CalendarDays, FolderKanban,
+  Bot, Search, Home,
+  DollarSign, Shield, LogIn, UserCheck,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { HomeSection } from '../../types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { UserMenu } from '../layout/UserMenu';
+import { ProfileSection } from './ProfileSection';
+import { ProjectCard } from './ProjectCard';
+import type { HomeSection, Project } from '../../types';
 import styles from './HomePage.module.css';
 
 /** Static AI Director Crew roster — kept in sync with the selectable agents
@@ -42,11 +47,27 @@ const AGENT_ROSTER = [
 
 export function HomePage() {
   const {
-    projects, setActiveProject, openWizard, setScreen, user, logout,
-    homeSection, setHomeSection, settings, updateSettings,
+    projects, setActiveProject, openWizard, setScreen, user,
+    homeSection, setHomeSection, settings, updateSettings, deleteProject,
   } = useStudioStore();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'development'>('all');
   const [search, setSearch] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!projectToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteProject(projectToDelete.id);
+      toast.success(`"${projectToDelete.name}" deleted.`);
+      setProjectToDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete the project.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const activeCount = projects.filter((p) => p.status === 'active').length;
   const developmentCount = projects.filter((p) => p.status === 'development').length;
@@ -74,7 +95,6 @@ export function HomePage() {
     { id: 'hub', label: 'Studio Hub', icon: <Home size={15} className={styles.navIcon} /> },
     { id: 'projects', label: 'Film Projects', icon: <FolderKanban size={15} className={styles.navIcon} />, badge: projects.length },
     { id: 'agents', label: 'AI Agent Crew', icon: <Bot size={15} className={styles.navIcon} /> },
-    { id: 'settings', label: 'Settings', icon: <Settings size={15} className={styles.navIcon} /> },
   ];
 
   return (
@@ -111,25 +131,7 @@ export function HomePage() {
           <div className={styles.connChip}>
             <span className={styles.greenDot} /> ClickHouse Cloud: Connected
           </div>
-          {user ? (
-            <div className={styles.userProfile}>
-              <img src={user.avatar} alt={user.name} className={styles.avatarImg} />
-              <div className={styles.userInfo}>
-                <div className={styles.userName}>{user.name}</div>
-                <div className={styles.userRole}>{user.role}</div>
-              </div>
-              <button
-                className={styles.sidebarSignOutBtn}
-                title="Sign Out"
-                onClick={() => {
-                  logout();
-                  setScreen('login');
-                }}
-              >
-                <LogOut size={14} color="#EF4444" />
-              </button>
-            </div>
-          ) : (
+          {!user && (
             <button className={styles.sidebarLoginBtn} onClick={() => setScreen('login')}>
               <LogIn size={14} /> Sign In
             </button>
@@ -153,20 +155,8 @@ export function HomePage() {
           </div>
 
           <div className={styles.headerRight}>
-            <button className={styles.iconBtn} title="Settings" onClick={() => setHomeSection('settings')}><Settings size={16} /></button>
-
             {user ? (
-              <button
-                className={styles.headerSignOutBtn}
-                title={`Logged in as ${user.name} — Click to Sign Out`}
-                onClick={() => {
-                  logout();
-                  setScreen('login');
-                }}
-              >
-                <LogOut size={13} color="#EF4444" />
-                <span>Sign Out</span>
-              </button>
+              <UserMenu />
             ) : (
               <button className={styles.headerLoginBtn} onClick={() => setScreen('login')}>
                 <UserCheck size={13} color="var(--accent)" />
@@ -180,58 +170,6 @@ export function HomePage() {
           {/* VIEW 1: STUDIO HUB */}
           {homeSection === 'hub' && (
             <>
-              {/* HERO BANNER */}
-              <section className={styles.hero}>
-                <div className={styles.heroText}>
-                  <div className={styles.heroBadge}>
-                    <Sparkles size={12} /> Hollywood Pre-Production Platform · AI Powered
-                  </div>
-                  <h1>Hollywood Director &amp; Producer Command Center</h1>
-                  <p>
-                    Automate script breakdowns, stripboard schedules, shot lists, and below-the-line budget caps with multi-agent crew intelligence.
-                  </p>
-                  <div className={styles.heroActions}>
-                    <button className={styles.heroPrimaryBtn} onClick={openWizard}>
-                      <Plus size={16} /> Initiate New Film Project
-                    </button>
-                    <button
-                      className={styles.heroSecondaryBtn}
-                      onClick={() => { setActiveProject(projects[0]); setScreen('workbench'); }}
-                    >
-                      <Play size={14} /> Launch Active Workbench{projects[0] ? ` (${projects[0].name})` : ''}
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.heroMetrics}>
-                  <div className={styles.metricCard}>
-                    <div className={styles.metricLbl}>ClickHouse Memory Engine</div>
-                    <div className={styles.metricVal} style={{ color: 'var(--cyan)' }}>
-                      <Database size={16} /> Connected
-                    </div>
-                    <div className={styles.metricSub}>{AGENT_ROSTER.length} AI Agents on Crew</div>
-                  </div>
-
-                  <div className={styles.metricCard}>
-                    <div className={styles.metricLbl}>Active Projects</div>
-                    <div className={styles.metricVal} style={{ color: 'var(--accent)' }}>
-                      {projects.length} Productions
-                    </div>
-                    <div className={styles.metricSub}>
-                      {projects.filter((p) => p.status === 'active').length} Active · {projects.filter((p) => p.status === 'development').length} Development
-                    </div>
-                  </div>
-
-                  <div className={styles.metricCard}>
-                    <div className={styles.metricLbl}>Combined Budget Cap</div>
-                    <div className={styles.metricVal} style={{ color: 'var(--grn)' }}>
-                      ${projects.reduce((sum, p) => sum + p.budgetCap, 0).toLocaleString('en-US')}
-                    </div>
-                    <div className={styles.metricSub}>Across {projects.length} Productions</div>
-                  </div>
-                </div>
-              </section>
-
               {/* PROJECTS SECTION */}
               <section className={styles.section}>
                 <div className={styles.sectionHeader}>
@@ -257,51 +195,17 @@ export function HomePage() {
                   </div>
 
                   {filteredProjects.map((p) => (
-                    <div
+                    <ProjectCard
                       key={p.id}
-                      className={styles.projectCard}
-                      onClick={() => { setActiveProject(p); setScreen('workbench'); }}
-                    >
-                      <div className={styles.cardHeader}>
-                        <span className={styles.phaseBadge}>{p.phase}</span>
-                        <span className={styles.timeAgo}>{p.updatedAt}</span>
-                      </div>
-
-                      <h3 className={styles.projTitle}>{p.name}</h3>
-                      <div className={styles.projMeta}>
-                        <span>{p.format}</span> · <span>{p.genre}</span>
-                      </div>
-
-                      <div className={styles.statsRow}>
-                        <div>
-                          <div className={styles.statLabel}>Scenes</div>
-                          <div className={styles.statNum}>{p.scenesCount} Scenes</div>
-                        </div>
-                        <div>
-                          <div className={styles.statLabel}>Budget Cap</div>
-                          <div className={styles.statNum} style={{ color: p.estimatedCost > p.budgetCap ? 'var(--red)' : 'var(--grn)' }}>
-                            ${p.budgetCap.toLocaleString()}
-                          </div>
-                        </div>
-                        <div>
-                          <div className={styles.statLabel}>Shoot Days</div>
-                          <div className={styles.statNum}>{p.shootDays} Days</div>
-                        </div>
-                      </div>
-
-                      {p.scriptFile && (
-                        <div className={styles.scriptFileTag}>
-                          <FileText size={12} color="var(--cyan)" />
-                          <span>{p.scriptFile}</span>
-                        </div>
-                      )}
-
-                      <div className={styles.cardFooter}>
-                        <span className={styles.launchText}>Open Director Workbench</span>
-                        <ArrowRight size={14} className={styles.launchIcon} />
-                      </div>
-                    </div>
+                      project={p}
+                      onOpen={() => { setActiveProject(p); setScreen('workbench'); }}
+                      onDelete={() => setProjectToDelete(p)}
+                    />
                   ))}
+
+                  {filteredProjects.length === 0 && projects.length > 0 && (
+                    <div className={styles.noResults}>No productions match your search or filter.</div>
+                  )}
                 </div>
               </section>
 
@@ -349,50 +253,12 @@ export function HomePage() {
 
               <div className={styles.projectGrid}>
                 {projects.map((p) => (
-                  <div
+                  <ProjectCard
                     key={p.id}
-                    className={styles.projectCard}
-                    onClick={() => { setActiveProject(p); setScreen('workbench'); }}
-                  >
-                    <div className={styles.cardHeader}>
-                      <span className={styles.phaseBadge}>{p.phase}</span>
-                      <span className={styles.timeAgo}>{p.updatedAt}</span>
-                    </div>
-
-                    <h3 className={styles.projTitle}>{p.name}</h3>
-                    <div className={styles.projMeta}>
-                      <span>{p.format}</span> · <span>{p.genre}</span>
-                    </div>
-
-                    <div className={styles.statsRow}>
-                      <div>
-                        <div className={styles.statLabel}>Scenes</div>
-                        <div className={styles.statNum}>{p.scenesCount} Scenes</div>
-                      </div>
-                      <div>
-                        <div className={styles.statLabel}>Budget Cap</div>
-                        <div className={styles.statNum} style={{ color: p.estimatedCost > p.budgetCap ? 'var(--red)' : 'var(--grn)' }}>
-                          ${p.budgetCap.toLocaleString()}
-                        </div>
-                      </div>
-                      <div>
-                        <div className={styles.statLabel}>Shoot Days</div>
-                        <div className={styles.statNum}>{p.shootDays} Days</div>
-                      </div>
-                    </div>
-
-                    {p.scriptFile && (
-                      <div className={styles.scriptFileTag}>
-                        <FileText size={12} color="var(--cyan)" />
-                        <span>{p.scriptFile}</span>
-                      </div>
-                    )}
-
-                    <div className={styles.cardFooter}>
-                      <span className={styles.launchText}>Open Director Workbench</span>
-                      <ArrowRight size={14} className={styles.launchIcon} />
-                    </div>
-                  </div>
+                    project={p}
+                    onOpen={() => { setActiveProject(p); setScreen('workbench'); }}
+                    onDelete={() => setProjectToDelete(p)}
+                  />
                 ))}
               </div>
             </section>
@@ -473,8 +339,32 @@ export function HomePage() {
               </div>
             </section>
           )}
+
+          {/* VIEW 5: PROFILE */}
+          {homeSection === 'profile' && <ProfileSection />}
         </div>
       </main>
+
+      {/* DELETE PROJECT CONFIRMATION */}
+      <Dialog open={!!projectToDelete} onOpenChange={(open) => { if (!open) setProjectToDelete(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete "{projectToDelete?.name}"?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes the production and every scene, budget item, shot,
+              and storyboard tied to it. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button className={styles.dialogCancelBtn} onClick={() => setProjectToDelete(null)} disabled={deleting}>
+              Cancel
+            </button>
+            <button className={styles.dialogDeleteBtn} onClick={confirmDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete Production'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

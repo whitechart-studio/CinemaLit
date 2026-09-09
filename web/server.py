@@ -4,6 +4,7 @@ Serves the React + TS Studio UI on http://localhost:8000 and provides live Gemin
 and ClickHouse Cloud query proxy endpoints.
 """
 
+import base64
 import http.server
 import socketserver
 import os
@@ -44,7 +45,7 @@ from web.auth import (
 )
 from web.db import CH_DB, CH_HOST, CH_PORT, ch_escape, ch_ping, ch_query
 
-PORT = int(os.getenv("CINEMALIT_WEB_PORT", "8000"))
+PORT = int(os.getenv("CINEMALIT_WEB_PORT") or os.getenv("PORT") or "8000")
 WEB_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "cinemalit-studio", "dist")
 )
@@ -223,8 +224,73 @@ def get_scene_details(scene_number: str, project_id: str) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+def get_project_budget(project_id: str, scene_number: Optional[str] = None) -> dict:
+    """Retrieves the REAL project budget from the budget_items table: total budgeted/actual
+    spend, a per-category breakdown, and (if scene_number is given) just that scene's budget
+    lines and subtotal. Always use this for budget questions — never estimate or guess a
+    figure. Always pass the active project_id."""
+    try:
+        p = {"p": project_id}
+        totals = ch_query(
+            f"SELECT sum(budgeted_usd), sum(actual_usd) FROM {CH_DB}.budget_items FINAL WHERE project_id = {{p:String}}",
+            p,
+        ).get("data", [])
+        total_budgeted = float(totals[0][0]) if totals and totals[0][0] is not None else 0.0
+        total_actual = float(totals[0][1]) if totals and totals[0][1] is not None else 0.0
+
+        by_category = ch_query(
+            f"SELECT category, sum(budgeted_usd) FROM {CH_DB}.budget_items FINAL "
+            f"WHERE project_id = {{p:String}} GROUP BY category ORDER BY 2 DESC",
+            p,
+        ).get("data", [])
+        category_breakdown = {str(r[0]): float(r[1]) for r in by_category}
+
+        result = {
+            "project_id": project_id,
+            "total_budgeted": total_budgeted,
+            "total_actual": total_actual,
+            "category_breakdown": category_breakdown,
+        }
+
+        if scene_number:
+            q = {"sn": scene_number, "p": project_id}
+            scene = ch_query(
+                f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}",
+                q,
+            ).get("data", [])
+            if not scene:
+                result["scene_budget_error"] = f"Scene {scene_number} not found in project {project_id}."
+            else:
+                q2 = {"s_id": scene[0][0], "p": project_id}
+                items = ch_query(
+                    f"SELECT category, description, budgeted_usd, actual_usd FROM {CH_DB}.budget_items FINAL "
+                    f"WHERE scene_id = {{s_id:UInt32}} AND project_id = {{p:String}}",
+                    q2,
+                ).get("data", [])
+                result["scene_number"] = scene_number
+                result["scene_budget_items"] = [
+                    {"category": str(r[0]), "description": str(r[1]), "budgeted_usd": float(r[2]), "actual_usd": float(r[3])}
+                    for r in items
+                ]
+                result["scene_total_budgeted"] = sum(i["budgeted_usd"] for i in result["scene_budget_items"])
+                if not items:
+                    result["scene_budget_note"] = (
+                        "This scene has no scene-linked budget_items — those are typically only "
+                        "AI-derived VFX/SFX/stunt/prop lines. Cast, location and other overhead "
+                        "costs are tracked at the project level, not per scene."
+                    )
+
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def add_scene_element(scene_number: str, element_type: str, name: str, cost_usd: float, vendor: str, project_id: str) -> dict:
-    """Proactively adds a new breakdown element (e.g. vfx, sfx, prop, stunt, cast) to a scene in the database. Always pass the active project_id."""
+    """Adds a new breakdown element (e.g. vfx, sfx, prop, stunt, wardrobe) to a scene in the
+    database. Also acts as an UPDATE: calling this again with the same scene_number + name
+    overwrites that element's type/cost/vendor in place rather than duplicating it — this is
+    how you edit an existing element's cost or vendor. To rename an element, delete it and add
+    it again under the new name. Always pass the active project_id."""
     try:
         scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
         if not scene:
@@ -236,11 +302,187 @@ def add_scene_element(scene_number: str, element_type: str, name: str, cost_usd:
             INSERT INTO {CH_DB}.elements (project_id, element_id, scene_id, element_type, name, cost_usd, vendor, status)
             VALUES ({{p:String}}, {{e_id:UInt32}}, {{s_id:UInt32}}, {{type:String}}, {{name:String}}, {{cost:Float64}}, {{vendor:String}}, 'planned')
         """, {"p": project_id, "e_id": new_id, "s_id": s_id, "type": element_type, "name": name, "cost": cost_usd, "vendor": vendor})
+        # Mirrors pipeline.py's ingest-time element→budget_items derivation (pipeline.py:550-563)
+        # so the Budget tab / get_project_budget total reflect agent-added costs too — without
+        # this, the element row was invisible to every budget-facing read path.
+        if cost_usd > 0:
+            item_id = zlib.crc32(f"{project_id}:{scene_number}:bi:{name}".encode()) or 1
+            ch_query(f"""
+                INSERT INTO {CH_DB}.budget_items (project_id, item_id, category, sub_category, description, budgeted_usd, actual_usd, vendor, scene_id)
+                VALUES ({{p:String}}, {{i:UInt32}}, {{cat:String}}, {{sub:String}}, {{d:String}}, {{b:Float64}}, 0, {{v:String}}, {{s_id:UInt32}})
+            """, {
+                "p": project_id, "i": item_id,
+                "cat": "VFX" if element_type in ("vfx", "sfx") else "Production",
+                "sub": element_type.upper(), "d": f"{scene_number} — {name}",
+                "b": cost_usd, "v": vendor, "s_id": s_id,
+            })
         return {"status": "success", "message": f"Added {name} ({element_type}) to {scene_number} for ${cost_usd}"}
     except Exception as e:
         return {"error": str(e)}
 
-AGENT_TOOLS = [query_production_db, get_scene_details, add_scene_element]
+def delete_scene_element(scene_number: str, name: str, project_id: str) -> dict:
+    """Removes a breakdown element (and its mirrored budget line, if any) from a scene by its
+    exact name. Use when the user wants a previously added prop/vfx/sfx/stunt/wardrobe item
+    taken out entirely. Always pass the active project_id."""
+    try:
+        element_id = zlib.crc32(f"{project_id}:{scene_number}:{name}".encode()) or 1
+        item_id = zlib.crc32(f"{project_id}:{scene_number}:bi:{name}".encode()) or 1
+        ch_query(f"ALTER TABLE {CH_DB}.elements DELETE WHERE project_id = {{p:String}} AND element_id = {{e_id:UInt32}}", {"p": project_id, "e_id": element_id})
+        ch_query(f"ALTER TABLE {CH_DB}.budget_items DELETE WHERE project_id = {{p:String}} AND item_id = {{i_id:UInt32}}", {"p": project_id, "i_id": item_id})
+        return {"status": "success", "message": f"Removed {name} from {scene_number}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def add_budget_item(project_id: str, category: str, description: str, budgeted_usd: float, vendor: str = "", sub_category: str = "", scene_number: Optional[str] = None) -> dict:
+    """Adds (or updates, if you call it again with the same category + description) a
+    project-level budget line directly in budget_items — for costs that aren't tied to a
+    specific scene breakdown element, e.g. above-the-line cast fees, crew day rates, equipment
+    rentals, insurance, post-production. Pass scene_number only if this cost is tied to one
+    scene. Always pass the active project_id."""
+    try:
+        s_id = None
+        if scene_number:
+            scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
+            if not scene:
+                return {"error": f"Scene {scene_number} not found in project {project_id}."}
+            s_id = scene[0][0]
+        item_id = zlib.crc32(f"{project_id}:{category}:{description}".encode()) or 1
+        params = {"p": project_id, "i": item_id, "cat": category, "sub": sub_category, "d": description, "b": budgeted_usd, "v": vendor}
+        scene_col_sql, scene_val_sql = ("scene_id", "{s_id:UInt32}") if s_id is not None else ("scene_id", "NULL")
+        if s_id is not None:
+            params["s_id"] = s_id
+        ch_query(f"""
+            INSERT INTO {CH_DB}.budget_items (project_id, item_id, category, sub_category, description, budgeted_usd, actual_usd, vendor, {scene_col_sql})
+            VALUES ({{p:String}}, {{i:UInt32}}, {{cat:String}}, {{sub:String}}, {{d:String}}, {{b:Float64}}, 0, {{v:String}}, {scene_val_sql})
+        """, params)
+        return {"status": "success", "message": f"Added budget line '{description}' (${budgeted_usd}) under {category}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def delete_budget_item(project_id: str, category: str, description: str) -> dict:
+    """Removes a project-level budget line previously added with add_budget_item, matched by
+    its exact category + description. Always pass the active project_id."""
+    try:
+        item_id = zlib.crc32(f"{project_id}:{category}:{description}".encode()) or 1
+        ch_query(f"ALTER TABLE {CH_DB}.budget_items DELETE WHERE project_id = {{p:String}} AND item_id = {{i_id:UInt32}}", {"p": project_id, "i_id": item_id})
+        return {"status": "success", "message": f"Removed budget line '{description}' under {category}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def add_cast_member(project_id: str, character_name: str, actor_name: str = "", role_type: str = "Supporting", day_rate_usd: float = 0, scene_number: Optional[str] = None) -> dict:
+    """Adds a new cast member, or updates one (calling again with the same character_name
+    overwrites actor/role/day-rate rather than duplicating). Pass scene_number to also link
+    this character to that scene's cast list. Always pass the active project_id."""
+    try:
+        key = character_name.strip().upper()
+        cast_id = zlib.crc32(f"{project_id}:{key}".encode()) or 1
+        ch_query(f"""
+            INSERT INTO {CH_DB}.cast_members (project_id, cast_id, character_name, actor_name, role_type, day_rate_usd, total_days)
+            VALUES ({{p:String}}, {{c:UInt32}}, {{n:String}}, {{a:String}}, {{r:String}}, {{d:Float64}}, 1)
+        """, {"p": project_id, "c": cast_id, "n": character_name, "a": actor_name, "r": role_type, "d": day_rate_usd})
+        if scene_number:
+            scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
+            if not scene:
+                return {"error": f"Cast member saved, but scene {scene_number} not found in project {project_id} — not linked."}
+            ch_query(f"""
+                INSERT INTO {CH_DB}.scene_cast (project_id, scene_id, cast_id) VALUES ({{p:String}}, {{s_id:UInt32}}, {{c:UInt32}})
+            """, {"p": project_id, "s_id": scene[0][0], "c": cast_id})
+        return {"status": "success", "message": f"Added/updated cast member {character_name}" + (f", linked to {scene_number}" if scene_number else "")}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def remove_cast_member(project_id: str, character_name: str, scene_number: Optional[str] = None) -> dict:
+    """If scene_number is given, unlinks that character from just that scene's cast list.
+    If scene_number is omitted, removes the cast member entirely from the project (and every
+    scene link). Always pass the active project_id."""
+    try:
+        cast_id = zlib.crc32(f"{project_id}:{character_name.strip().upper()}".encode()) or 1
+        if scene_number:
+            scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
+            if not scene:
+                return {"error": f"Scene {scene_number} not found in project {project_id}."}
+            ch_query(f"ALTER TABLE {CH_DB}.scene_cast DELETE WHERE project_id = {{p:String}} AND scene_id = {{s_id:UInt32}} AND cast_id = {{c:UInt32}}", {"p": project_id, "s_id": scene[0][0], "c": cast_id})
+            return {"status": "success", "message": f"Unlinked {character_name} from {scene_number}"}
+        ch_query(f"ALTER TABLE {CH_DB}.scene_cast DELETE WHERE project_id = {{p:String}} AND cast_id = {{c:UInt32}}", {"p": project_id, "c": cast_id})
+        ch_query(f"ALTER TABLE {CH_DB}.cast_members DELETE WHERE project_id = {{p:String}} AND cast_id = {{c:UInt32}}", {"p": project_id, "c": cast_id})
+        return {"status": "success", "message": f"Removed cast member {character_name} from the project"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def add_shot(project_id: str, scene_number: str, shot_code: str, framing: str = "WS", description: str = "", lens_mm: int = 50, movement: str = "Static") -> dict:
+    """Adds a shot to a scene's shot list, or updates one (calling again with the same
+    shot_code overwrites framing/lens/movement/description rather than duplicating). Always
+    pass the active project_id."""
+    try:
+        scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
+        if not scene:
+            return {"error": f"Scene {scene_number} not found in project {project_id}."}
+        s_id = scene[0][0]
+        shot_id = zlib.crc32(f"{project_id}:{shot_code}".encode()) or 1
+        ch_query(f"""
+            INSERT INTO {CH_DB}.shots (project_id, shot_id, scene_id, shot_code, lens_mm, movement, framing, description, status)
+            VALUES ({{p:String}}, {{sh:UInt32}}, {{s_id:UInt32}}, {{c:String}}, {{l:UInt16}}, {{m:String}}, {{f:String}}, {{d:String}}, 'planned')
+        """, {
+            "p": project_id, "sh": shot_id, "s_id": s_id, "c": shot_code,
+            "l": max(8, min(1000, int(lens_mm or 50))), "m": movement, "f": framing[:12], "d": description[:1000],
+        })
+        return {"status": "success", "message": f"Added/updated shot {shot_code} on {scene_number}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def delete_shot(project_id: str, scene_number: str, shot_code: str) -> dict:
+    """Removes a shot from a scene's shot list by its exact shot_code. Always pass the
+    active project_id."""
+    try:
+        shot_id = zlib.crc32(f"{project_id}:{shot_code}".encode()) or 1
+        ch_query(f"ALTER TABLE {CH_DB}.shots DELETE WHERE project_id = {{p:String}} AND shot_id = {{sh:UInt32}}", {"p": project_id, "sh": shot_id})
+        return {"status": "success", "message": f"Removed shot {shot_code}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def reschedule_scene(project_id: str, scene_number: str, shoot_day: int) -> dict:
+    """Moves a scene to a different shoot day on the stripboard/schedule. Always pass the
+    active project_id."""
+    try:
+        scene = ch_query(f"SELECT scene_id FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
+        if not scene:
+            return {"error": f"Scene {scene_number} not found in project {project_id}."}
+        ch_query(f"ALTER TABLE {CH_DB}.scenes UPDATE shoot_day = {{d:UInt8}} WHERE project_id = {{p:String}} AND scene_id = {{s_id:UInt32}}", {"p": project_id, "d": shoot_day, "s_id": scene[0][0]})
+        return {"status": "success", "message": f"Moved {scene_number} to shoot day {shoot_day}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def get_scene_script(scene_number: str, project_id: str) -> dict:
+    """READ-ONLY: retrieves the actual screenplay prose (scene_text) for one scene — the raw
+    slugline + action + dialogue, not the short AI-generated synopsis. Use this when the user
+    asks what a scene's script actually says, to quote it, or as reference before suggesting an
+    edit. There is no tool to write or rewrite script text — script changes are made by the
+    human via the screenplay editor, never by this agent. Always pass the active project_id."""
+    try:
+        scene = ch_query(f"SELECT scene_text FROM {CH_DB}.scenes FINAL WHERE scene_number = {{sn:String}} AND project_id = {{p:String}}", {"sn": scene_number, "p": project_id}).get("data", [])
+        if not scene:
+            return {"error": f"Scene {scene_number} not found in project {project_id}."}
+        return {"scene_number": scene_number, "project_id": project_id, "scene_text": scene[0][0]}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+AGENT_TOOLS = [
+    query_production_db, get_scene_details, get_scene_script, get_project_budget,
+    add_scene_element, delete_scene_element,
+    add_budget_item, delete_budget_item,
+    add_cast_member, remove_cast_member,
+    add_shot, delete_shot,
+    reschedule_scene,
+]
 
 
 class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -314,6 +556,12 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_dga_check()
         elif path == "/api/projects":
             self._handle_create_project()
+        elif path == "/api/projects/delete":
+            self._handle_delete_project()
+        elif path == "/api/auth/update-profile":
+            self._handle_update_profile()
+        elif path == "/api/auth/delete-account":
+            self._handle_delete_account()
         elif path == "/api/projects/storyboards":
             self._handle_project_storyboards()
         elif path == "/api/ai/generate-storyboard":
@@ -575,6 +823,65 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as exc:
             json_resp(self, {"status": "error", "error": str(exc)}, 500)
 
+    def _handle_update_profile(self):
+        user_data = verify_jwt(self._bearer_token())
+        if not user_data:
+            json_resp(self, {"status": "error", "error": "Invalid or expired JWT token"}, 401)
+            return
+        data = self._read_json()
+        name = (data.get("name") or "").strip()
+        if not name:
+            json_resp(self, {"status": "error", "error": "Name cannot be empty"}, 400)
+            return
+
+        email = user_data.get("email")
+        try:
+            ch_query(
+                f"ALTER TABLE {CH_DB}.users UPDATE name = {{n:String}} WHERE email = {{email:String}}",
+                {"n": name, "email": email},
+            )
+            role = user_data.get("role")
+            token = create_jwt(user_data.get("sub"), email, name, role)
+            res = ch_query(
+                f"SELECT user_id, avatar_url FROM {CH_DB}.users WHERE email = {{email:String}}",
+                {"email": email},
+            )
+            rows = res.get("data", [])
+            avatar = rows[0][1] if rows else f"https://api.dicebear.com/7.x/avataaars/svg?seed={email}"
+            json_resp(
+                self,
+                {
+                    "status": "ok",
+                    "token": token,
+                    "user": {"id": user_data.get("sub"), "email": email, "name": name, "role": role, "avatar": avatar},
+                },
+            )
+        except Exception as exc:
+            json_resp(self, {"status": "error", "error": str(exc)}, 500)
+
+    def _handle_delete_account(self):
+        """Delete the signed-in user's own account, plus every project they
+        own (and that project's scoped data) — 'delete my profile' means the
+        whole thing goes, not an orphaned row nobody can reach again."""
+        user_data = verify_jwt(self._bearer_token())
+        if not user_data:
+            json_resp(self, {"status": "error", "error": "Invalid or expired JWT token"}, 401)
+            return
+        email = user_data.get("email")
+        user_id = str(user_data.get("sub") or "")
+        try:
+            owned = ch_query(
+                f"SELECT project_id FROM {CH_DB}.projects FINAL WHERE user_id = {{u:String}}",
+                {"u": user_id},
+            ).get("data", [])
+            for (project_id,) in owned:
+                for table in PROJECT_SCOPED_TABLES:
+                    ch_query(f"ALTER TABLE {CH_DB}.{table} DELETE WHERE project_id = {{p:String}}", {"p": str(project_id)})
+            ch_query(f"ALTER TABLE {CH_DB}.users DELETE WHERE email = {{email:String}}", {"email": email})
+            json_resp(self, {"status": "ok"})
+        except Exception as exc:
+            json_resp(self, {"status": "error", "error": str(exc)}, 500)
+
     # ── Project handlers ──────────────────────────────────────────────────
 
     def _query_param(self, name: str, default: str = "") -> str:
@@ -714,6 +1021,24 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         threading.Thread(target=_target, daemon=True).start()
 
+    def _handle_delete_project(self):
+        """Delete a project and every row scoped to it. Lightweight `ALTER
+        ... DELETE` mutations — same idiom already used elsewhere in this
+        file (see governance_gates/scenes cleanup in cinemalit_agent)."""
+        data = self._read_json()
+        project_id = str(data.get("projectId") or "")
+        if not project_id:
+            json_resp(self, {"status": "error", "error": "projectId required"}, 400)
+            return
+        if not self._require_project_access(project_id, write=True):
+            return
+        try:
+            for table in PROJECT_SCOPED_TABLES:
+                ch_query(f"ALTER TABLE {CH_DB}.{table} DELETE WHERE project_id = {{p:String}}", {"p": project_id})
+            json_resp(self, {"status": "ok", "projectId": project_id})
+        except Exception as exc:
+            json_resp(self, {"status": "error", "error": str(exc)}, 500)
+
     def _handle_list_projects(self):
         user = self._require_auth()
         if user is None:
@@ -802,6 +1127,12 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     # ── AI handlers ───────────────────────────────────────────────────────
 
+    # Gemini accepts these natively (vision / native PDF layout understanding)
+    # inline, no local text extraction needed. Anything else (Office docs,
+    # etc.) isn't supported yet — those need local text extraction first.
+    _CHAT_ATTACHMENT_MIME_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"}
+    _CHAT_ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024  # 15MB — comfortably under Gemini's inline-request ceiling
+
     def _handle_ai_chat(self):
         user = self._require_auth()
         if user is None:
@@ -814,12 +1145,31 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
         if not self._require_project_access(project_id):
             return
+
+        file_bytes = None
+        file_mime_type = data.get("fileMimeType") or None
+        file_data_b64 = data.get("fileData") or None
+        if file_data_b64:
+            if file_mime_type not in self._CHAT_ATTACHMENT_MIME_TYPES:
+                json_resp(self, {"status": "error", "error": f"Unsupported attachment type: {file_mime_type}. Only images (PNG/JPEG/WEBP/GIF) and PDF are supported."}, 400)
+                return
+            try:
+                file_bytes = base64.b64decode(file_data_b64)
+            except Exception:
+                json_resp(self, {"status": "error", "error": "Attachment could not be decoded — expected base64."}, 400)
+                return
+            if len(file_bytes) > self._CHAT_ATTACHMENT_MAX_BYTES:
+                json_resp(self, {"status": "error", "error": "Attachment too large — 15MB max."}, 400)
+                return
+
         try:
             if USE_ADK_AGENT:
                 from cinemalit_agent.bridge import ask_agent
                 reply_text = ask_agent(
                     f"[Active project: {project_id}] {user_msg}",
                     session_id=self._agent_session(user, f"chat:{project_id}"),
+                    file_bytes=file_bytes,
+                    file_mime_type=file_mime_type,
                 )
                 from cinemalit_agent.agent import GEMINI_MODEL as AGENT_MODEL
                 source = f"{AGENT_MODEL} (ADK Agent)"
@@ -843,7 +1193,10 @@ class StudioRequestHandler(http.server.SimpleHTTPRequestHandler):
                     )
                 )
                 
-                response = chat.send_message(user_msg)
+                message_parts = [user_msg]
+                if file_bytes is not None:
+                    message_parts.append(types.Part.from_bytes(data=file_bytes, mime_type=file_mime_type))
+                response = chat.send_message(message_parts)
                 reply_text = response.text.strip()
                 source = f"{GEMINI_MODEL} (Agentic)"
             else:

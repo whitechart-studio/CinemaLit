@@ -30,6 +30,53 @@
   color: var(--t3);
 }
 
+/* FILTER BAR */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--t3);
+}
+
+.filterSelect {
+  background: var(--bg-elev);
+  height: 30px !important;
+  font-size: .78rem;
+}
+
+.clearBtn {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: background .14s;
+}
+.clearBtn:hover { background: var(--accent-muted); }
+
+.filterCount {
+  margin-left: auto;
+  font-size: .72rem;
+  color: var(--t3);
+}
+
 .body {
   flex: 1;
   overflow-y: auto;
@@ -44,14 +91,16 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .cardHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-height: 34px;
   padding: 9px 12px;
+  background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
 }
 
@@ -66,12 +115,22 @@
 .sceneType {
   font-size: .65rem;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
 .cardTitle {
   font-size: .82rem;
   font-weight: 700;
   flex: 1;
+}
+
+.dayTag {
+  font-size: .64rem;
+  font-weight: 700;
+  color: var(--t3);
+  background: var(--bg-hover);
+  padding: 2px 7px;
+  border-radius: 4px;
 }
 
 .pgCount {
@@ -95,23 +154,23 @@
   margin-bottom: 4px;
 }
 
+/* Neutral chips everywhere — the column label above already says what a tag
+   is (cast/props/vfx/...); a 5th hue per category read as "too many colors"
+   with 209 cards on screen. Risk Level is the one tag that still carries its
+   own semantic color (via inline style), since that's a real severity signal. */
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   padding: 3px 7px;
   border-radius: 4px;
   font-size: .7rem;
   font-weight: 600;
   margin: 2px;
   cursor: default;
+  background: var(--bg-hover);
+  color: var(--t1);
 }
-
-.etCast { background: var(--pur-d); color: var(--pur); }
-.etProp { background: var(--accent-muted); color: var(--accent); }
-.etVfx  { background: var(--cyan-d); color: var(--cyan); }
-.etWard { background: var(--grn-d); color: var(--grn); }
-.etSfx  { background: var(--red-d); color: var(--red); }
 
 .none {
   font-size: .72rem;

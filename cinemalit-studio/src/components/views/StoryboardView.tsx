@@ -316,7 +316,11 @@ export function StoryboardView() {
 
         {/* FRAME GRID SEQUENCE */}
         <div className={styles.grid}>
-          {activeSb.frames.map((fr) => (
+          {generatingScene === activeSb.sceneNum ? (
+            Array.from({ length: Math.ceil(activeSb.totalDurationSec / Math.max(1, customInterval)) }).map((_, i) => (
+              <Skeleton key={`skel-${i}`} className={`${styles.frameCard} h-full w-full`} />
+            ))
+          ) : activeSb.frames.map((fr) => (
             <div key={fr.id} className={styles.frameCard}>
               <div className={styles.imgWrapper} onClick={() => setPreviewImg({ url: fr.imgUrl, title: fr.title, spec: fr.cameraSpec })}>
                 <img src={fr.imgUrl} alt={fr.title} className={styles.frameImg} />

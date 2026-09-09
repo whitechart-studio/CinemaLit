@@ -1,0 +1,33 @@
+/* src/components/layout/UserMenu.module.css */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: all .15s;
+}
+.trigger:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--accent);
+  background: var(--bg-elev);
+}
+
+.name {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.chevron {
+  color: var(--t3);
+}

@@ -62,10 +62,14 @@ interface StudioState {
   token: string | null;
   setAuth: (user: AuthUser | null, token: string | null) => void;
   logout: () => void;
+  updateProfile: (name: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 
   // Navigation / Screen Router
   currentScreen: ScreenId;
   setScreen: (screen: ScreenId) => void;
+  authTab: 'login' | 'register';
+  setAuthTab: (tab: 'login' | 'register') => void;
 
   // Director AI chat rail — toggleable the same way the Inspector is.
   chatOpen: boolean;
@@ -91,6 +95,7 @@ interface StudioState {
   activeProject: Project;
   setActiveProject: (p: Project) => void;
   createProject: (form: NewProjectForm) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
   loadProjectScenes: (projectId: string) => Promise<void>;
 
@@ -226,8 +231,28 @@ export const useStudioStore = create<StudioState>((set) => ({
     set({ user: null, token: null });
   },
 
-  currentScreen: 'home',
+  updateProfile: async (name) => {
+    const resp = await apiFetch('/api/auth/update-profile', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not update profile');
+    useStudioStore.getState().setAuth(data.user, data.token);
+  },
+
+  deleteAccount: async () => {
+    const resp = await apiFetch('/api/auth/delete-account', { method: 'POST' });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not delete account');
+    useStudioStore.getState().logout();
+    set({ currentScreen: 'login' });
+  },
+
+  currentScreen: 'landing',
   setScreen: (screen) => set({ currentScreen: screen }),
+  authTab: 'login',
+  setAuthTab: (tab) => set({ authTab: tab }),
 
   chatOpen: true,
   setChatOpen: (open) => set({ chatOpen: open }),
@@ -314,6 +339,16 @@ export const useStudioStore = create<StudioState>((set) => ({
     void pollJob(data.projectId, 'ingest', form.generateStoryboards);
   },
 
+  deleteProject: async (projectId) => {
+    const resp = await apiFetch('/api/projects/delete', {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    });
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Could not delete the project');
+    set((s) => ({ projects: s.projects.filter((p) => p.id !== projectId) }));
+  },
+
   refreshProjects: async () => {
     try {
       const data = await (await apiFetch('/api/projects')).json();
@@ -330,7 +365,11 @@ export const useStudioStore = create<StudioState>((set) => ({
       const data = await (await apiFetch(`/api/clickhouse/scenes?projectId=${projectId}`)).json();
       if (data.status !== 'ok' || !Array.isArray(data.scenes)) return;
       const scenes: Scene[] = data.scenes.map((sc: any, i: number) => ({
-        id: `sn-${projectId}-${sc.sceneNum}`,
+        // sc.sceneNum is a display-only, lossy last-2-digits truncation (see
+        // server.py's `short`) — scene 007, 107, 207 all render "07" and would
+        // collide here. sc.sceneNumber is the full original ("SC-007"), the
+        // only field actually unique per project.
+        id: `sn-${projectId}-${sc.sceneNumber}`,
         num: String(sc.sceneNum).padStart(2, '0'),
         slug: sc.slugline,
         type: String(sc.slugline).startsWith('EXT') ? 'EXT' : 'INT',

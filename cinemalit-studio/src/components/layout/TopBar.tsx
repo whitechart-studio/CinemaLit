@@ -1,14 +1,11 @@
-import { Download, Settings, Clapperboard, Home, UserCheck } from 'lucide-react';
+import { Clapperboard, Home, UserCheck } from 'lucide-react';
 import { useStudioStore } from '../../store/studio';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { UserMenu } from './UserMenu';
 import styles from './TopBar.module.css';
 
-interface Props {
-  onExport: () => void;
-}
-
-export function TopBar({ onExport }: Props) {
-  const { setScreen, setHomeSection, projects, activeProject, setActiveProject, user } = useStudioStore();
+export function TopBar() {
+  const { setScreen, projects, activeProject, setActiveProject, user } = useStudioStore();
 
   return (
     <header className={styles.topbar}>
@@ -41,16 +38,9 @@ export function TopBar({ onExport }: Props) {
 
         <div className={styles.right}>
           <button className={styles.iconBtn} title="Studio Hub" onClick={() => setScreen('home')}><Home size={15} /></button>
-          <button className={styles.iconBtn} title="Settings" onClick={() => { setScreen('home'); setHomeSection('settings'); }}><Settings size={15} /></button>
-          <button className={styles.primaryBtn} onClick={onExport}>
-            <Download size={13} />Greenlight Binder
-          </button>
 
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src={user.avatar} alt={user.name} className={styles.userAvatar} title={`${user.name} (${user.role})`} />
-              <span className={styles.userPillName}>{user.name}</span>
-            </div>
+            <UserMenu />
           ) : (
             <button
               className={styles.loginPillBtn}

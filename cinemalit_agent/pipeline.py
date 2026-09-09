@@ -16,7 +16,7 @@ directly for this. It asks the agent to ingest a project; the agent calls
 per frame, so there is nothing to gain by batching them).
 
 Why two extra agents instead of doing it all on the root agent: the root
-agent carries 20 tool declarations on every turn, and breakdown needs zero
+agent carries 27 tool declarations on every turn, and breakdown needs zero
 of them — the scene text is already in hand and the output shape is fixed.
 `breakdown_agent` / `storyboard_agent` are ADK agents with an `output_schema`
 and no tools, so a call costs one small structured response instead of a

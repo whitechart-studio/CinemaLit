@@ -193,9 +193,18 @@ def suggest_budget_savings(project_id: str, target_budget: float = 5000.0) -> di
 
 
 def generate_schedule(project_id: str, target_days: int = 2) -> dict:
-    """Generate an optimized stripboard shoot schedule from live scene data."""
+    """Generate an optimized stripboard shoot schedule from live scene data, and PERSIST it —
+    every scene's shoot_day is written to the database, so the Stripboard/Call Sheet tabs show
+    the new plan immediately. This is a real reschedule, not just a preview."""
     state = _build_state_from_clickhouse(project_id)
     plan = ScheduleCrew.generate_plan(state, target_days=target_days)
+    for day in plan.days:
+        for scene_id in day.scene_ids:
+            ch_query(
+                "ALTER TABLE cinemalit.scenes UPDATE shoot_day = {d:UInt8} "
+                "WHERE project_id = {p:String} AND scene_id = {s:UInt32}",
+                {"p": project_id, "d": day.day_number, "s": int(scene_id)},
+            )
     return plan.__dict__
 
 
@@ -255,12 +264,14 @@ def ask_gemini_direct(prompt: str) -> dict:
 
 
 def query_studio_memory(query: str, project_id: str) -> dict:
-    """Query structured studio knowledge — budget, schedule, risk, or scene
-    summaries — computed fresh from live ClickHouse data."""
+    """Query structured studio knowledge — schedule, risk, or scene
+    summaries — computed fresh from live ClickHouse data. For budget
+    questions, use get_project_budget instead — it reads real budget_items
+    figures rather than a formula estimate."""
     state = _build_state_from_clickhouse(project_id)
     query_lower = query.lower()
     if "budget" in query_lower:
-        return BudgetCrew.calculate_budget(state).__dict__
+        return {"error": "Use get_project_budget for real budget figures, not this tool."}
     if "risk" in query_lower:
         _, risks = ProductionCrew.breakdown(state)
         return {"risks": [r.__dict__ for r in risks]}

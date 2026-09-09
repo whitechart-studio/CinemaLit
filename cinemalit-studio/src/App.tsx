@@ -7,6 +7,7 @@ import { apiFetch } from './utils/api';
 import { useKeyboard } from './hooks/useKeyboard';
 import { JobBanner } from './components/layout/JobBanner';
 import { HomePage } from './components/home/HomePage';
+import { LandingPage } from './components/screens/LandingPage';
 import { LoginScreen } from './components/screens/LoginScreen';
 import { NewProjectWizard } from './components/wizard/NewProjectWizard';
 
@@ -49,19 +50,17 @@ export default function App() {
     if (user) void refreshProjects();
   }, [user, refreshProjects]);
 
-  const handleExport = () => {
-    window.open('/greenlight_package.html', '_blank');
-  };
-
   return (
     <>
-      {!user || currentScreen === 'login' ? (
+      {!user && currentScreen === 'landing' ? (
+        <LandingPage />
+      ) : !user || currentScreen === 'login' ? (
         <LoginScreen />
       ) : currentScreen === 'home' ? (
         <HomePage />
       ) : (
         <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <TopBar onExport={handleExport} />
+          <TopBar />
 
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             <LeftRail />

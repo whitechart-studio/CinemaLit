@@ -46,14 +46,14 @@ web/server.py   (Python stdlib threaded HTTP server, :8000)
    └── every AI endpoint
           ▼
    cinemalit_agent  (Google ADK)
-      root_agent "cinemalit_director" — 17 tools
-        ├─ 3  web-app tools     (query DB, scene details, add element)
+      root_agent "cinemalit_director" — 27 tools
+        ├─ 13 production-db tools (read/write scene, budget, cast, shot, schedule)
         ├─ 12 crew tools        (risks, breakdown, budget, schedule, ops,
         │                        governance, audit, studio memory)
         └─ 2  pipeline tools    (ingest script, generate storyboards)
              ├─ breakdown_agent   — schema-constrained, no tools
              ├─ storyboard_agent  — schema-constrained, no tools
-             └─ Gemini image model → storyboard JPEGs
+             └─ pollinations.ai (flux) → storyboard JPEGs
                      ▼
               ClickHouse Cloud  (all writes)
 ```
@@ -161,10 +161,13 @@ and ping.
 
 ## Agent tools
 
-The Director Agent carries 17 tools:
+The Director Agent carries 27 tools:
 
-**Production database (3)** — `query_production_db` (SELECT-only),
-`get_scene_details`, `add_scene_element`.
+**Production database (13)** — `query_production_db` (SELECT-only),
+`get_scene_details`, `get_scene_script`, `get_project_budget`,
+`add_scene_element`, `delete_scene_element`, `add_budget_item`,
+`delete_budget_item`, `add_cast_member`, `remove_cast_member`, `add_shot`,
+`delete_shot`, `reschedule_scene`.
 
 **Crew (12)** — `analyze_script`, `list_scenes`, `find_risks`,
 `production_breakdown`, `estimate_budget_pressure`, `suggest_budget_savings`,
